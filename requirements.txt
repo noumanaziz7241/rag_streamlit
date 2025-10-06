@@ -1,0 +1,10 @@
+streamlit
+tiktoken
+langchain-core
+langgraph
+langchain-pinecone
+pinecone
+langchain-deepseek
+python-dotenv
+langchain-google-genai
+langgraph.checkpoint.sqlite

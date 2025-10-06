@@ -1,0 +1,8 @@
+.env
+venv
+data-node
+__pychache__
+meili_data_v1.12
+*.db*
+.streamlit/
+*.sqlite3
