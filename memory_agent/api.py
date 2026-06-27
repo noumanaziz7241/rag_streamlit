@@ -6,7 +6,8 @@ from typing import Any, Dict, Generator, List
 
 from memory_agent.agent.graph import MemoryAgent
 from memory_agent.config import DEFAULT_SESSION_ID, DEFAULT_USER_ID
-from memory_agent.models import ChatRequest, ChatResponse
+from memory_agent.documents.registry import IndexedDocument
+from memory_agent.models import ChatRequest, ChatResponse, IngestResult
 from memory_agent.sessions.store import ChatSession, SessionStore
 
 
@@ -48,7 +49,18 @@ class ChatAPI:
         self.agent.clear_thread(user_id=user_id, session_id=session_id)
 
     def ingest_file(self, filename: str, raw_bytes: bytes) -> int:
-        return self.agent.ingest_uploaded_file(filename, raw_bytes)
+        result = self.ingest_file_detailed(filename, raw_bytes)
+        return result.chunks
+
+    def ingest_file_detailed(self, filename: str, raw_bytes: bytes) -> IngestResult:
+        chunks, skipped = self.agent.ingest_uploaded_file(filename, raw_bytes)
+        return IngestResult(chunks=chunks, skipped=skipped, source=filename)
+
+    def list_documents(self) -> List[IndexedDocument]:
+        return self.agent.list_documents()
+
+    def delete_document(self, doc_id: str) -> bool:
+        return self.agent.delete_document(doc_id)
 
     def _touch_session_after_chat(
         self,

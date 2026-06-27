@@ -7,6 +7,13 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
+class IngestResult:
+    chunks: int
+    skipped: bool
+    source: str
+
+
+@dataclass
 class ChatRequest:
     message: str
     user_id: str
