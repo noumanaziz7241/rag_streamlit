@@ -1,11 +1,22 @@
 # Memory Agent Chat
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Memory Agent Chat demo — streaming responses, agent tool transparency, and source citations" width="860" />
+</p>
+
+<p align="center">
+  <em>Streaming answers · expandable agent tools · grounded source citations</em>
+</p>
+
 A Streamlit chat application powered by LangGraph that combines conversational memory, domain knowledge retrieval (RAG), and persistent multi-session chat history. The agent remembers user-specific facts, retrieves chunked domain documents with MMR search, and keeps each conversation in its own checkpointed thread.
 
 ## Features
 
 - **Multi-session chat** — Create, switch, clear, and delete conversations; each session has isolated history
 - **Checkpoint-backed history** — LangGraph `SqliteSaver` is the source of truth; the UI reloads history from checkpoints on session switch and page refresh
+- **Streaming responses** — Assistant replies stream token-by-token while the agent runs
+- **Source citations** — Retrieved documents appear in an expandable **Sources** panel with filename, modality, chunk index, preview text, and image thumbnails
+- **Tool transparency** — Expandable **Agent tools** panel shows when `save_memory`, `recall_memory`, or `retrieve_domain` ran and what they returned
 - **Conversational memory** — Stores and recalls user-specific facts via a dedicated Pinecone memory index (filtered by user + session)
 - **Multimodal RAG** — [Gemini Embedding 2](https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2) indexes text, PDF, images, audio, and video in a unified vector space; [Gemini Flash](https://ai.google.dev/gemini-api/docs/models) interprets retrieved media for the chat LLM
 - **Tool-augmented agent** — DeepSeek model with `save_memory`, `recall_memory`, and `retrieve_domain` tools
@@ -19,7 +30,8 @@ rag_streamlit/
 │   ├── bootstrap.py              # Environment setup, warning suppression
 │   ├── main.py                   # App entry point
 │   └── ui/
-│       ├── chat.py               # Chat interface
+│       ├── chat.py               # Chat interface (streaming + citations)
+│       ├── message_render.py     # Tool transparency + source citation UI
 │       ├── sidebar.py            # Sessions + document upload
 │       └── state.py              # Streamlit session state helpers
 ├── memory_agent/                 # Core package
@@ -41,6 +53,10 @@ rag_streamlit/
 │   └── vectorstore/
 │       ├── domain_index.py       # Multimodal Pinecone index
 │       └── manager.py            # Pinecone domain + memory stores
+├── assets/
+│   └── demo.gif                  # README demo animation
+├── scripts/
+│   └── generate_demo_gif.py      # Regenerate demo GIF
 ├── streamlit_chat.py             # Backward-compatible entry point
 ├── requirements.txt
 ├── .env.example
@@ -149,19 +165,45 @@ Retrieved image/audio/video/PDF chunks are described at answer time with **Gemin
 
 ### Documents
 
-Upload any supported file in the sidebar and click **Index documents**.
+Upload any supported file in the sidebar and click **Index documents**. When you ask a question, the assistant cites retrieved chunks under **Sources** in each reply.
+
+### Demo flow
+
+1. Upload a PDF or text file in the sidebar and click **Index documents**
+2. Ask a question about the uploaded content
+3. Watch the response **stream** in real time
+4. Expand **Agent tools** to see `retrieve_domain` (and memory tools when used)
+5. Expand **Sources** to inspect filenames, chunk indexes, and previews
+
+Example prompts:
+
+- *"Summarize the main points from the uploaded document."*
+- *"Remember that my favorite programming language is Python."* → then *"What do you remember about me?"*
+- *"What does the image in my knowledge base show?"* (after uploading an image)
 
 ### Memory
 
 Tell the agent facts to remember. Memories are scoped to the current user and session.
+
+### Regenerate the demo GIF
+
+The hero GIF is checked in at `assets/demo.gif`. To recreate it (or replace with a real screen recording converted to GIF):
+
+```bash
+python scripts/generate_demo_gif.py
+```
+
+For a live screen capture, record the app with [Peek](https://github.com/phw/peek) or [LICEcap](https://www.cockos.com/licecap/), then save as `assets/demo.gif`.
 
 ## Key Modules
 
 | Module | Responsibility |
 |--------|----------------|
 | `app/main.py` | Streamlit entry point and page layout |
-| `memory_agent/api.py` | Sessions, history, ingestion, and chat API |
-| `memory_agent/agent/graph.py` | LangGraph agent with checkpointed threads |
+| `app/ui/chat.py` | Streaming chat UI with tool and citation panels |
+| `app/ui/message_render.py` | Renders agent tool activity and source citations |
+| `memory_agent/api.py` | Sessions, history, ingestion, streaming chat API |
+| `memory_agent/agent/graph.py` | LangGraph agent with streaming events + checkpointed threads |
 | `memory_agent/rag/embeddings.py` | `gemini-embedding-2` embedding client |
 | `memory_agent/rag/loaders.py` | Multimodal file loaders |
 | `memory_agent/rag/multimodal.py` | Gemini Flash media descriptions |

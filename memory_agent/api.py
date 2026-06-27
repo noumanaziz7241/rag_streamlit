@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, Generator, List
 
 from memory_agent.agent.graph import MemoryAgent
 from memory_agent.config import DEFAULT_SESSION_ID, DEFAULT_USER_ID
@@ -37,7 +37,7 @@ class ChatAPI:
         self,
         user_id: str = DEFAULT_USER_ID,
         session_id: str = DEFAULT_SESSION_ID,
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         return self.agent.get_chat_history(user_id=user_id, session_id=session_id)
 
     def clear_session_history(
@@ -50,6 +50,16 @@ class ChatAPI:
     def ingest_file(self, filename: str, raw_bytes: bytes) -> int:
         return self.agent.ingest_uploaded_file(filename, raw_bytes)
 
+    def _touch_session_after_chat(
+        self,
+        message: str,
+        session_id: str,
+    ) -> None:
+        session = self.sessions.get_session(session_id)
+        if session and session.title == "New chat":
+            self.sessions.update_title(session_id, message)
+        self.sessions.touch_session(session_id)
+
     def chat(self, request: ChatRequest) -> ChatResponse:
         try:
             result = self.agent.process_message(
@@ -58,17 +68,15 @@ class ChatAPI:
                 session_id=request.session_id,
             )
 
-            session = self.sessions.get_session(request.session_id)
-            if session and session.title == "New chat":
-                self.sessions.update_title(request.session_id, request.message)
-
-            self.sessions.touch_session(request.session_id)
+            self._touch_session_after_chat(request.message, request.session_id)
 
             return ChatResponse(
                 response=result["response"],
                 user_id=result["user_id"],
                 session_id=result["session_id"],
                 success=True,
+                tools_used=result.get("tools_used", []),
+                sources=result.get("sources", []),
             )
         except Exception as e:
             return ChatResponse(
@@ -78,6 +86,25 @@ class ChatAPI:
                 success=False,
                 error=str(e),
             )
+
+    def chat_stream(
+        self,
+        message: str,
+        user_id: str = DEFAULT_USER_ID,
+        session_id: str = DEFAULT_SESSION_ID,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Yield streaming chat events for the UI."""
+        try:
+            for event in self.agent.process_message_stream(
+                message=message,
+                user_id=user_id,
+                session_id=session_id,
+            ):
+                yield event
+
+            self._touch_session_after_chat(message, session_id)
+        except Exception as e:
+            yield {"type": "error", "error": str(e)}
 
     def chat_dict(
         self,
@@ -98,4 +125,6 @@ class ChatAPI:
             "session_id": response.session_id,
             "success": response.success,
             "error": response.error,
+            "tools_used": response.tools_used,
+            "sources": response.sources,
         }
