@@ -102,6 +102,9 @@ def render_sidebar() -> None:
         st.markdown("### Agent Capabilities")
         st.markdown(
             """
+            - **Streaming**: Responses appear token-by-token
+            - **Sources**: Expand citations for retrieved documents
+            - **Tools**: See memory and retrieval tool activity per reply
             - **Sessions**: Each conversation has its own persistent history
             - **Memory**: Remembers user-specific facts per session
             - **RAG**: Multimodal retrieval (text, image, audio, video, PDF) via Gemini Embedding 2
