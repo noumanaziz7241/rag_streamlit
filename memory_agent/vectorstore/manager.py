@@ -8,6 +8,7 @@ from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
 from memory_agent.config import EMBEDDING_DIMENSION, NAMESPACE, get_config_value
+from memory_agent.google.credentials import resolve_google_auth
 from memory_agent.rag.embeddings import GeminiEmbeddingClient, GeminiTextEmbeddings
 from memory_agent.vectorstore.domain_index import DomainVectorIndex
 
@@ -16,7 +17,9 @@ class VectorStoreManager:
     """Manages Pinecone vector stores for domain knowledge and memory."""
 
     def __init__(self):
-        os.environ["GOOGLE_API_KEY"] = get_config_value("GEMINI_API_KEY")
+        auth = resolve_google_auth()
+        if auth.mode == "api_key" and auth.api_key:
+            os.environ["GOOGLE_API_KEY"] = auth.api_key
 
         self.embedding_client = GeminiEmbeddingClient()
         self.embeddings = GeminiTextEmbeddings(self.embedding_client)

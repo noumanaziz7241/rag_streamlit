@@ -10,16 +10,21 @@ from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage, get_buffer_string
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
-from langchain_deepseek import ChatDeepSeek
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from memory_agent.agent.tools import MemoryTools
-from memory_agent.config import DEFAULT_SESSION_ID, DEFAULT_USER_ID, get_config_value
+from memory_agent.config import DEFAULT_SESSION_ID, DEFAULT_USER_ID
 from memory_agent.documents.registry import DocumentRegistry
+from memory_agent.google.chat_model import create_chat_model
 from memory_agent.models import SourceCitation
 from memory_agent.rag.pipeline import ingest_file
+from memory_agent.utils.message_content import extract_text_content
+from memory_agent.utils.sources import (
+    build_source_preview,
+    consolidate_sources_for_display,
+)
 from memory_agent.vectorstore.manager import VectorStoreManager
 
 TOOL_STATUS_LABELS = {
@@ -49,12 +54,7 @@ class MemoryAgent:
         self.tokenizer = tiktoken.encoding_for_model("gpt-4o-mini")
         self.checkpointer: Optional[SqliteSaver] = None
 
-        self.model = ChatDeepSeek(
-            model="deepseek-chat",
-            api_key=get_config_value("DEEPSEEK_API_KEY"),
-            base_url="https://api.deepseek.com",
-            temperature=0,
-        )
+        self.model = create_chat_model()
         self.model_with_tools = self.model.bind_tools(self.tools)
 
         self.prompt = ChatPromptTemplate.from_messages([
@@ -70,7 +70,8 @@ class MemoryAgent:
                 " * Use recall_memory when incorporating personal info\n"
                 " * Use retrieve_domain for factual or domain knowledge questions\n"
                 " * Ground answers in retrieved documents when available\n"
-                " * Cite sources by filename when retrieve_domain returns documents\n"
+                " * Do not paste long excerpts, chunk text, or source lists in your reply\n"
+                " * The UI shows sources separately — keep answers concise and readable\n"
                 " * After using tools, respond using returned data",
             ),
             ("placeholder", "{messages}"),
@@ -97,17 +98,24 @@ class MemoryAgent:
         if prediction is None:
             prediction = AIMessage(content="")
 
-        if prediction.content and not getattr(prediction, "tool_calls", None):
-            ui_tools = list(state.get("ui_tools", []))
-            ui_sources = self._dedupe_sources(state.get("ui_sources", []))
-            prediction = AIMessage(
-                content=prediction.content,
-                additional_kwargs={
-                    **(prediction.additional_kwargs or {}),
-                    "ui_tools": ui_tools,
-                    "ui_sources": ui_sources,
-                },
+        if prediction is None:
+            prediction = AIMessage(content="")
+
+        clean_content = extract_text_content(prediction.content)
+        tool_calls = getattr(prediction, "tool_calls", None)
+        kwargs = dict(prediction.additional_kwargs or {})
+
+        if clean_content and not tool_calls:
+            kwargs["ui_tools"] = list(state.get("ui_tools", []))
+            kwargs["ui_sources"] = self._prepare_sources_for_ui(
+                self._dedupe_sources(state.get("ui_sources", []))
             )
+
+        prediction = AIMessage(
+            content=clean_content,
+            tool_calls=tool_calls or [],
+            additional_kwargs=kwargs,
+        )
 
         return {"messages": [prediction]}
 
@@ -147,7 +155,9 @@ class MemoryAgent:
         return {
             "messages": result["messages"],
             "ui_tools": ui_tools,
-            "ui_sources": self._dedupe_sources(ui_sources),
+            "ui_sources": self._prepare_sources_for_ui(
+                self._dedupe_sources(ui_sources)
+            ),
         }
 
     @staticmethod
@@ -183,6 +193,10 @@ class MemoryAgent:
         }
 
     @staticmethod
+    def _prepare_sources_for_ui(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return consolidate_sources_for_display(sources)
+
+    @staticmethod
     def _dedupe_sources(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         deduped: List[Dict[str, Any]] = []
         seen: set[tuple[str, int]] = set()
@@ -212,12 +226,13 @@ class MemoryAgent:
                 source=source,
                 modality=str(meta.get("modality", "text")),
                 chunk_index=chunk_index,
-                preview=str(meta.get("text_preview") or (doc.page_content or "")[:400]),
+                preview=build_source_preview(meta, doc.page_content or ""),
                 storage_path=meta.get("storage_path"),
+                relevance_score=float(meta.get("relevance_score", 0.0)),
             )
             sources.append(citation.to_dict())
 
-        return sources
+        return consolidate_sources_for_display(sources)
 
     def _parse_tool_message(self, msg: ToolMessage) -> Dict[str, Any]:
         name = msg.name or "unknown"
@@ -235,7 +250,7 @@ class MemoryAgent:
             docs = msg.artifact if getattr(msg, "artifact", None) else []
             sources = self._documents_to_sources(list(docs))
             unique_files = len({s["source"] for s in sources})
-            summary = f"Retrieved {len(sources)} chunks from {unique_files} document(s)"
+            summary = f"Retrieved {unique_files} document(s)"
             return {"tool": name, "summary": summary, "sources": sources}
         else:
             summary = f"Completed {name}"
@@ -273,7 +288,7 @@ class MemoryAgent:
 
         for index, msg in enumerate(messages):
             if isinstance(msg, HumanMessage):
-                history.append({"role": "user", "content": str(msg.content)})
+                history.append({"role": "user", "content": extract_text_content(msg.content)})
                 turn_start = index + 1
                 continue
 
@@ -287,7 +302,7 @@ class MemoryAgent:
 
                 history.append({
                     "role": "assistant",
-                    "content": str(msg.content),
+                    "content": extract_text_content(msg.content),
                     "tools_used": list(tools_used or []),
                     "sources": list(sources or []),
                 })
@@ -331,89 +346,17 @@ class MemoryAgent:
 
     @staticmethod
     def _chunk_text(content: Any) -> str:
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            parts: List[str] = []
-            for block in content:
-                if isinstance(block, str):
-                    parts.append(block)
-                elif isinstance(block, dict) and block.get("type") == "text":
-                    parts.append(str(block.get("text", "")))
-            return "".join(parts)
-        return str(content or "")
+        return extract_text_content(content)
 
     def _iter_stream_events(
         self,
         state: Dict[str, Any],
         config: Dict[str, Any],
     ) -> Generator[Dict[str, Any], None, None]:
-        """Yield normalized events from LangGraph stream modes."""
-        stream_events_fn = getattr(self.graph, "stream_events", None)
-        if stream_events_fn is not None:
-            for event in stream_events_fn(state, config=config, version="v2"):
-                kind = event.get("event")
-                metadata = event.get("metadata", {})
-                node = metadata.get("langgraph_node", "")
+        """Yield normalized events from LangGraph stream modes.
 
-                if kind == "on_chain_end" and event.get("name") == "load_recalls":
-                    output = event.get("data", {}).get("output", {})
-                    recalls = output.get("recall_memories", [])
-                    for tool in output.get("ui_tools", []):
-                        yield {"type": "tool_done", **tool}
-                    if recalls:
-                        yield {
-                            "type": "status",
-                            "message": f"Preloaded {len(recalls)} relevant memories",
-                        }
-
-                elif kind == "on_chain_end" and event.get("name") == "tools":
-                    output = event.get("data", {}).get("output", {})
-                    for tool_msg in output.get("messages", []):
-                        if not isinstance(tool_msg, ToolMessage):
-                            continue
-                        activity = self._parse_tool_message(tool_msg)
-                        tool_call_id = tool_msg.tool_call_id
-                        yield {
-                            "type": "tool_done",
-                            "tool_call_id": tool_call_id,
-                            "tool": activity["tool"],
-                            "summary": activity["summary"],
-                        }
-                        for source in activity.get("sources", []):
-                            yield {"type": "source", "source": source}
-
-                elif kind == "on_chain_end" and event.get("name") == "agent":
-                    output = event.get("data", {}).get("output", {})
-                    messages = output.get("messages", [])
-                    if not messages:
-                        continue
-                    last_msg = messages[-1]
-                    if getattr(last_msg, "tool_calls", None):
-                        for tool_call in last_msg.tool_calls:
-                            tool_call_id = tool_call.get("id") or tool_call.get("name", "unknown")
-                            yield {
-                                "type": "tool_start",
-                                "tool_call_id": tool_call_id,
-                                "tool": tool_call.get("name", "unknown"),
-                                "summary": TOOL_STATUS_LABELS.get(
-                                    tool_call.get("name", ""),
-                                    f"Running {tool_call.get('name', 'tool')}…",
-                                ),
-                                "input": tool_call.get("args", {}),
-                            }
-
-                elif kind == "on_chat_model_stream" and node == "agent":
-                    chunk = event.get("data", {}).get("chunk")
-                    if isinstance(chunk, AIMessageChunk):
-                        if getattr(chunk, "tool_call_chunks", None):
-                            continue
-                        text = self._chunk_text(chunk.content)
-                        if text:
-                            yield {"type": "token", "content": text}
-
-            return
-
+        Uses ``graph.stream()`` — LangGraph 1.2+ rejects sync ``stream_events(version="v2")``.
+        """
         for mode, chunk in self.graph.stream(
             state,
             config=config,

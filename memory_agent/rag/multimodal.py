@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from google import genai
 from google.genai import types
 
-from memory_agent.config import get_config_value, get_gemini_multimodal_model
+from memory_agent.config import get_gemini_multimodal_model
+from memory_agent.google.genai_client import get_genai_client
 from memory_agent.rag.media_store import MediaStore
 
 
@@ -13,7 +13,7 @@ class GeminiMultimodalClient:
     """Uses Gemini Flash to turn media chunks into text context for the chat LLM."""
 
     def __init__(self, media_store: MediaStore | None = None):
-        self.client = genai.Client(api_key=get_config_value("GEMINI_API_KEY"))
+        self.client = get_genai_client()
         self.model = get_gemini_multimodal_model()
         self.media_store = media_store or MediaStore()
 

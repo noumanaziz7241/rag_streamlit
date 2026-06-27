@@ -22,7 +22,7 @@ A Streamlit chat application powered by LangGraph that combines conversational m
 - **Document management** — List, deduplicate, and delete indexed files from the knowledge base UI
 - **Conversational memory** — Stores and recalls user-specific facts via a dedicated Pinecone memory index (filtered by user + session)
 - **Multimodal RAG** — [Gemini Embedding 2](https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2) indexes text, PDF, images, audio, and video in a unified vector space; [Gemini Flash](https://ai.google.dev/gemini-api/docs/models) interprets retrieved media for the chat LLM
-- **Tool-augmented agent** — DeepSeek model with `save_memory`, `recall_memory`, and `retrieve_domain` tools
+- **Tool-augmented agent** — Gemini chat model with `save_memory`, `recall_memory`, and `retrieve_domain` tools (DeepSeek fallback available but commented out)
 - **Modular codebase** — Separated into `memory_agent` (core logic) and `app` (Streamlit UI)
 
 ## Project Structure
@@ -96,7 +96,7 @@ Streamlit UI (app/)
         └── MemoryAgent ──► LangGraph checkpointed threads
                 │
                 ├── load_recalls ──► recall_memory (Pinecone memory)
-                ├── agent ──► DeepSeek + full thread history
+                ├── agent ──► Gemini + full thread history
                 └── tools ──► save_memory | recall_memory | retrieve_domain
                                       │
                                       ▼
@@ -112,7 +112,7 @@ Streamlit UI (app/)
 |-----------|------------|
 | UI | Streamlit |
 | Agent orchestration | LangGraph |
-| LLM | DeepSeek (`deepseek-chat`) |
+| LLM | Gemini (`gemini-2.5-flash`) via Google credentials / API key |
 | Embeddings | Google Gemini Embedding 2 (`gemini-embedding-2`, 768-dim) |
 | Multimodal understanding | Gemini Flash (`gemini-2.5-flash`, configurable) |
 | Vector store | Pinecone (serverless) |
@@ -121,7 +121,9 @@ Streamlit UI (app/)
 ## Prerequisites
 
 - Python 3.11+
-- API keys for [DeepSeek](https://platform.deepseek.com/), [Google AI (Gemini)](https://aistudio.google.com/), and [Pinecone](https://www.pinecone.io/)
+- Google access via **`GEMINI_API_KEY`** (simplest), **`google_client_secret.json`** + OAuth token locally, or Streamlit secrets on Cloud
+- Pinecone API key and index names
+- DeepSeek is **commented out** until an API key is available (see `memory_agent/google/chat_model.py`)
 
 ## Installation
 
@@ -135,17 +137,82 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Create `.streamlit/secrets.toml` (see `.env.example`):
+**Recommended (works without GCP org access):** get a key from [Google AI Studio](https://aistudio.google.com/apikey) and set `GEMINI_API_KEY` in `.env` or Streamlit secrets.
+
+**Vertex AI (optional):** place `google_client_secret.json` in the project root (OAuth client or service account JSON from Google Cloud). Then run once:
+
+```bash
+python scripts/google_auth.py
+```
+
+This creates `google_token.json` for Vertex AI access. Enable the **Vertex AI API** on your GCP project.
+
+> **Org-restricted GCP:** if your organization blocks service account key creation (`iam.disableServiceAccountKeyCreation`) or OAuth is internal-only, skip Vertex and use **`GEMINI_API_KEY`** only. The app falls back to the API key automatically when OAuth/Vertex credentials are incomplete.
+
+### Streamlit Cloud deployment
+
+On [share.streamlit.io](https://share.streamlit.io) → **Settings → Secrets**. Full guide: **[docs/DEPLOY.md](docs/DEPLOY.md)**
+
+**Easiest — Google AI Studio API key:**
 
 ```toml
-GEMINI_API_KEY = "your-gemini-api-key"
-DEEPSEEK_API_KEY = "your-deepseek-api-key"
+GEMINI_API_KEY = "..."
+PINECONE_API_KEY = "..."
+PINECONE_INDEX_NAME = "..."
+PINECONE_MEMORY_INDEX_NAME = "..."
+```
+
+**Vertex via service account** (only if your org allows JSON key download):
+
+```toml
+PINECONE_API_KEY = "..."
+PINECONE_INDEX_NAME = "..."
+PINECONE_MEMORY_INDEX_NAME = "..."
+
+[google_service_account]
+type = "service_account"
+project_id = "your-gcp-project-id"
+private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+client_email = "your-sa@your-project.iam.gserviceaccount.com"
+# ... remaining service account fields from downloaded JSON
+```
+
+**Your OAuth client JSON** — run `python scripts/google_auth.py` locally, then paste `[google_client_secret.web]` and `[google_token]` into Streamlit secrets (see `docs/DEPLOY.md`). Requires OAuth consent that allows your Google account.
+
+Alternatively, create `.streamlit/secrets.toml` locally:
+
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+```
+
+```toml
 PINECONE_API_KEY = "your-pinecone-api-key"
-PINECONE_INDEX_NAME = "your-domain-index-name"
-PINECONE_MEMORY_INDEX_NAME = "your-memory-index-name"
+PINECONE_INDEX_NAME = "memory-agent-domain"
+PINECONE_MEMORY_INDEX_NAME = "memory-agent-memory"
+GEMINI_API_KEY = "your-gemini-api-key"
 ```
 
 Keys can also be set in a `.env` file as a fallback.
+
+### Pinecone indexes
+
+The app needs **two serverless indexes**, both **768 dimensions** (Gemini Embedding 2), **cosine** metric:
+
+| Index env var | Purpose |
+|---------------|---------|
+| `PINECONE_INDEX_NAME` | Uploaded documents (RAG knowledge base) |
+| `PINECONE_MEMORY_INDEX_NAME` | Long-term session memory |
+
+Create them once with your Pinecone API key:
+
+```bash
+cp .env.example .env   # set PINECONE_API_KEY (and index names if you prefer)
+python scripts/create_pinecone_indexes.py
+```
+
+Default names: `memory-agent-domain` and `memory-agent-memory`. The app also auto-creates missing indexes on first run if they do not exist.
+
+List existing indexes: `python scripts/create_pinecone_indexes.py --list`
 
 ## Quick start (one command)
 
