@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import os
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
-from memory_agent.config import NAMESPACE, get_config_value
+from memory_agent.config import EMBEDDING_DIMENSION, NAMESPACE, get_config_value
+from memory_agent.rag.embeddings import GeminiEmbeddingClient, GeminiTextEmbeddings
+from memory_agent.vectorstore.domain_index import DomainVectorIndex
 
 
 class VectorStoreManager:
@@ -17,13 +18,17 @@ class VectorStoreManager:
     def __init__(self):
         os.environ["GOOGLE_API_KEY"] = get_config_value("GEMINI_API_KEY")
 
-        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+        self.embedding_client = GeminiEmbeddingClient()
+        self.embeddings = GeminiTextEmbeddings(self.embedding_client)
         self.pc = Pinecone(api_key=get_config_value("PINECONE_API_KEY"))
         self.idx_domain = get_config_value("PINECONE_INDEX_NAME")
         self.idx_memory = get_config_value("PINECONE_MEMORY_INDEX_NAME")
+        self.domain_index = DomainVectorIndex(
+            embedding_client=self.embedding_client,
+        )
 
     def get_domain_vectorstore(self) -> PineconeVectorStore:
-        """Get domain knowledge vector store."""
+        """Legacy accessor — prefer domain_index for multimodal RAG."""
         domain_index = self.pc.Index(self.idx_domain)
         return PineconeVectorStore(
             index=domain_index,
@@ -34,12 +39,9 @@ class VectorStoreManager:
     def get_memory_vectorstore(self) -> PineconeVectorStore:
         """Get or create memory vector store."""
         if not self.pc.has_index(self.idx_memory):
-            example_embedding = self.embeddings.embed_query("test")
-            embedding_dimension = len(example_embedding)
-
             self.pc.create_index(
                 name=self.idx_memory,
-                dimension=embedding_dimension,
+                dimension=EMBEDDING_DIMENSION,
                 metric="cosine",
                 spec=ServerlessSpec(cloud="aws", region="us-east-1"),
             )

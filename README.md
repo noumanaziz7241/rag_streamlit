@@ -7,7 +7,7 @@ A Streamlit chat application powered by LangGraph that combines conversational m
 - **Multi-session chat** — Create, switch, clear, and delete conversations; each session has isolated history
 - **Checkpoint-backed history** — LangGraph `SqliteSaver` is the source of truth; the UI reloads history from checkpoints on session switch and page refresh
 - **Conversational memory** — Stores and recalls user-specific facts via a dedicated Pinecone memory index (filtered by user + session)
-- **Production-style RAG** — Recursive chunking with overlap, document upload, and MMR retrieval for diverse relevant chunks
+- **Multimodal RAG** — [Gemini Embedding 2](https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2) indexes text, PDF, images, audio, and video in a unified vector space; [Gemini Flash](https://ai.google.dev/gemini-api/docs/models) interprets retrieved media for the chat LLM
 - **Tool-augmented agent** — DeepSeek model with `save_memory`, `recall_memory`, and `retrieve_domain` tools
 - **Modular codebase** — Separated into `memory_agent` (core logic) and `app` (Streamlit UI)
 
@@ -30,10 +30,16 @@ rag_streamlit/
 │   │   ├── graph.py              # LangGraph MemoryAgent
 │   │   └── tools.py              # save_memory, recall_memory, retrieve_domain
 │   ├── rag/
-│   │   └── pipeline.py           # Chunking, ingestion, MMR retrieval
+│   │   ├── embeddings.py         # gemini-embedding-2 client
+│   │   ├── loaders.py            # All file format loaders
+│   │   ├── media_store.py        # Local media persistence
+│   │   ├── multimodal.py         # Gemini Flash media understanding
+│   │   ├── pipeline.py           # Ingestion + MMR retrieval
+│   │   └── types.py              # RagChunk dataclass
 │   ├── sessions/
 │   │   └── store.py              # Session metadata (SQLite)
 │   └── vectorstore/
+│       ├── domain_index.py       # Multimodal Pinecone index
 │       └── manager.py            # Pinecone domain + memory stores
 ├── streamlit_chat.py             # Backward-compatible entry point
 ├── requirements.txt
@@ -57,10 +63,10 @@ Streamlit UI (app/)
                 └── tools ──► save_memory | recall_memory | retrieve_domain
                                       │
                                       ▼
-                            rag/pipeline (chunking + MMR)
+                            rag/pipeline + domain_index (multimodal MMR)
                                       │
                                       ▼
-                            Pinecone vector stores
+              gemini-embedding-2 + Gemini Flash + Pinecone
 ```
 
 ## Tech Stack
@@ -70,7 +76,8 @@ Streamlit UI (app/)
 | UI | Streamlit |
 | Agent orchestration | LangGraph |
 | LLM | DeepSeek (`deepseek-chat`) |
-| Embeddings | Google Gemini (`gemini-embedding-001`) |
+| Embeddings | Google Gemini Embedding 2 (`gemini-embedding-2`, 768-dim) |
+| Multimodal understanding | Gemini Flash (`gemini-2.5-flash`, configurable) |
 | Vector store | Pinecone (serverless) |
 | Session metadata + checkpoints | SQLite (`chat_memory.db`) |
 
@@ -125,9 +132,24 @@ Opens at [http://localhost:8501](http://localhost:8501).
 - **Clear** — Wipe the active session's LangGraph checkpoint
 - **Delete** — Remove session metadata and its checkpoint thread
 
+### Supported file types
+
+| Category | Formats | How it is indexed |
+|----------|---------|-------------------|
+| Text / code | `.txt`, `.md`, `.csv`, `.json`, `.py`, `.html`, … | Chunked text → `gemini-embedding-2` |
+| PDF | `.pdf` | Native PDF embedding (6 pages per chunk) |
+| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` | Native image embedding |
+| Audio | `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg` | Native audio embedding (~180s limit) |
+| Video | `.mp4`, `.mov`, `.webm`, `.avi` | Native video embedding (~120s limit) |
+| Office | `.docx`, `.xlsx`, `.pptx` | Text extraction → chunked embedding |
+
+Retrieved image/audio/video/PDF chunks are described at answer time with **Gemini Flash** so the text-based chat LLM can use them.
+
+> **Note:** `gemini-embedding-2` uses a different vector space than `gemini-embedding-001`. Re-index existing Pinecone data after upgrading.
+
 ### Documents
 
-Upload PDF, TXT, MD, or CSV files in the sidebar and click **Index documents** to chunk and embed them into Pinecone.
+Upload any supported file in the sidebar and click **Index documents**.
 
 ### Memory
 
@@ -140,9 +162,10 @@ Tell the agent facts to remember. Memories are scoped to the current user and se
 | `app/main.py` | Streamlit entry point and page layout |
 | `memory_agent/api.py` | Sessions, history, ingestion, and chat API |
 | `memory_agent/agent/graph.py` | LangGraph agent with checkpointed threads |
-| `memory_agent/rag/pipeline.py` | Document chunking and MMR retrieval |
-| `memory_agent/sessions/store.py` | Session metadata CRUD |
-| `memory_agent/vectorstore/manager.py` | Pinecone store management |
+| `memory_agent/rag/embeddings.py` | `gemini-embedding-2` embedding client |
+| `memory_agent/rag/loaders.py` | Multimodal file loaders |
+| `memory_agent/rag/multimodal.py` | Gemini Flash media descriptions |
+| `memory_agent/vectorstore/domain_index.py` | Multimodal Pinecone index + MMR |
 
 ## License
 

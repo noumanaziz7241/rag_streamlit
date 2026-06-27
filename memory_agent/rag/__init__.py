@@ -1,17 +1,13 @@
-from memory_agent.rag.pipeline import (
-    chunk_documents,
-    deduplicate_chunks,
-    format_retrieved_documents,
-    ingest_documents,
-    load_uploaded_file,
-    retrieve_domain_documents,
-)
+from memory_agent.rag.embeddings import GeminiEmbeddingClient, GeminiTextEmbeddings
+from memory_agent.rag.loaders import load_uploaded_file
+from memory_agent.rag.pipeline import ingest_file, retrieve_domain_documents
+from memory_agent.rag.types import RagChunk
 
 __all__ = [
-    "chunk_documents",
-    "deduplicate_chunks",
-    "format_retrieved_documents",
-    "ingest_documents",
+    "GeminiEmbeddingClient",
+    "GeminiTextEmbeddings",
+    "RagChunk",
+    "ingest_file",
     "load_uploaded_file",
     "retrieve_domain_documents",
 ]

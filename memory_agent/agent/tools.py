@@ -9,7 +9,6 @@ from langchain_core.documents import Document
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
-from memory_agent.config import NAMESPACE
 from memory_agent.rag.pipeline import retrieve_domain_documents
 from memory_agent.vectorstore.manager import VectorStoreManager
 
@@ -64,11 +63,9 @@ class MemoryTools:
         @tool(response_format="content_and_artifact")
         def retrieve_domain(query: str):
             """Retrieve domain / knowledge documents for a query."""
-            domain_vs = self.vs_manager.get_domain_vectorstore()
             serialized, docs = retrieve_domain_documents(
-                domain_vs,
+                self.vs_manager.domain_index,
                 query=query,
-                namespace=NAMESPACE,
             )
             return serialized, docs
 

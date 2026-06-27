@@ -24,12 +24,14 @@ htmlcov/
 .tox/
 .nox/
 
-# Streamlit
-.streamlit/
+# Streamlit (keep example secrets tracked)
+.streamlit/*
+!.streamlit/secrets.toml.example
 
 # Local databases
 *.db*
 *.sqlite3
+data/uploads/
 
 # Project-specific
 data-node/

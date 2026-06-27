@@ -80,9 +80,12 @@ def render_sidebar() -> None:
         st.caption(f"Namespace: `{NAMESPACE}`")
 
         uploaded_files = st.file_uploader(
-            "Upload documents",
-            type=["pdf", "txt", "md", "markdown", "csv"],
+            "Upload files (any format)",
             accept_multiple_files=True,
+            help=(
+                "Indexed with Gemini Embedding 2: text, PDF, images, audio, video, "
+                "Office (DOCX/XLSX/PPTX), code, and more."
+            ),
         )
 
         if uploaded_files and st.button("Index documents", use_container_width=True):
@@ -101,6 +104,6 @@ def render_sidebar() -> None:
             """
             - **Sessions**: Each conversation has its own persistent history
             - **Memory**: Remembers user-specific facts per session
-            - **RAG**: MMR retrieval over chunked domain documents
+            - **RAG**: Multimodal retrieval (text, image, audio, video, PDF) via Gemini Embedding 2
             """
         )

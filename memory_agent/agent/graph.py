@@ -16,7 +16,7 @@ from langgraph.prebuilt import ToolNode
 
 from memory_agent.agent.tools import MemoryTools
 from memory_agent.config import DEFAULT_SESSION_ID, DEFAULT_USER_ID, get_config_value
-from memory_agent.rag.pipeline import ingest_documents, load_uploaded_file
+from memory_agent.rag.pipeline import ingest_file
 from memory_agent.vectorstore.manager import VectorStoreManager
 
 
@@ -138,9 +138,7 @@ class MemoryAgent:
 
     def ingest_uploaded_file(self, filename: str, raw_bytes: bytes) -> int:
         """Chunk and index an uploaded file into the domain vector store."""
-        documents = load_uploaded_file(filename, raw_bytes)
-        vectorstore = self.vector_store_manager.get_domain_vectorstore()
-        return ingest_documents(vectorstore, documents)
+        return ingest_file(self.vector_store_manager.domain_index, filename, raw_bytes)
 
     def process_message(
         self,

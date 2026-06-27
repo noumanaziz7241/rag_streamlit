@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+# Streamlit executes this file with `app/` on sys.path — fix before package imports.
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import streamlit as st
 
 from app.bootstrap import bootstrap
 from app.ui.chat import render_chat
+from app.ui.config_setup import ensure_configured, render_config_setup
 from app.ui.sidebar import render_sidebar
 from app.ui.state import initialize_session_state, sync_messages_from_checkpoint
 from memory_agent.api import ChatAPI
@@ -35,6 +44,10 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    if not ensure_configured():
+        render_config_setup()
+        return
 
     initialize_session_state()
 

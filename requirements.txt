@@ -9,4 +9,8 @@ langchain-deepseek
 python-dotenv
 langchain-google-genai
 langgraph.checkpoint.sqlite
+google-genai
 pypdf
+python-docx
+openpyxl
+python-pptx
