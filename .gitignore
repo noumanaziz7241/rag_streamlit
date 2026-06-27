@@ -48,3 +48,9 @@ Thumbs.db
 
 # Eval output
 evals/results.json
+
+# Google OAuth / credentials (never commit secrets)
+google_client_secret.json
+google_token.json
+*-credentials.json
+service-account*.json

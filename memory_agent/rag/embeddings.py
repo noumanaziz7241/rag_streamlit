@@ -4,22 +4,21 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from google import genai
 from google.genai import types
 from langchain_core.embeddings import Embeddings
 
 from memory_agent.config import (
     EMBEDDING_DIMENSION,
     GEMINI_EMBEDDING_MODEL,
-    get_config_value,
 )
+from memory_agent.google.genai_client import get_genai_client
 
 
 class GeminiEmbeddingClient:
     """Wrapper around gemini-embedding-2 for retrieval-oriented embeddings."""
 
     def __init__(self):
-        self.client = genai.Client(api_key=get_config_value("GEMINI_API_KEY"))
+        self.client = get_genai_client()
         self.model = GEMINI_EMBEDDING_MODEL
         self.output_dimensionality = EMBEDDING_DIMENSION
 

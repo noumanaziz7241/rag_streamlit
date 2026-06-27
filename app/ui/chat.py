@@ -7,12 +7,14 @@ from typing import Any, Dict, List
 import streamlit as st
 
 from app.ui.message_render import render_citations, render_tool_transparency
+from memory_agent.utils.message_content import extract_text_content
+from memory_agent.utils.sources import consolidate_sources_for_display
 
 
 def _render_message(message: Dict[str, Any]) -> None:
     """Render a single chat message with optional tool and source metadata."""
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        st.markdown(extract_text_content(message["content"]))
         if message["role"] == "assistant":
             render_tool_transparency(message.get("tools_used", []))
             render_citations(message.get("sources", []))
@@ -120,9 +122,9 @@ def _stream_assistant_response(prompt: str) -> None:
             return
 
         elif event_type == "done":
-            full_response = event.get("response") or full_response
+            full_response = extract_text_content(event.get("response")) or full_response
             tools_used = event.get("tools_used") or tools_used
-            sources = event.get("sources") or sources
+            sources = consolidate_sources_for_display(event.get("sources") or sources)
 
             status_placeholder.empty()
             tools_placeholder.empty()

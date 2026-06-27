@@ -38,6 +38,7 @@ class SourceCitation:
     chunk_index: int
     preview: str
     storage_path: Optional[str] = None
+    relevance_score: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -46,6 +47,7 @@ class SourceCitation:
             "chunk_index": self.chunk_index,
             "preview": self.preview,
             "storage_path": self.storage_path,
+            "relevance_score": self.relevance_score,
         }
 
 

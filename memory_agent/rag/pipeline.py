@@ -11,9 +11,10 @@ from memory_agent.rag.loaders import load_uploaded_file
 from memory_agent.rag.types import RagChunk
 from memory_agent.vectorstore.domain_index import DomainVectorIndex
 
-RETRIEVAL_K = 8
-RETRIEVAL_FETCH_K = 24
-MMR_LAMBDA = 0.6
+RETRIEVAL_K = 6
+RETRIEVAL_FETCH_K = 20
+MMR_LAMBDA = 0.65
+MIN_RELEVANCE_SCORE = 0.40
 
 
 def ingest_file(
@@ -69,4 +70,5 @@ def retrieve_domain_documents(
         k=RETRIEVAL_K,
         fetch_k=RETRIEVAL_FETCH_K,
         lambda_mult=MMR_LAMBDA,
+        min_score=MIN_RELEVANCE_SCORE,
     )

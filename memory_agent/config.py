@@ -22,6 +22,11 @@ UPLOADS_DIR = str(PROJECT_ROOT / "data" / "uploads")
 GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"
 EMBEDDING_DIMENSION = 768
 GEMINI_MULTIMODAL_MODEL = "gemini-2.5-flash"
+GEMINI_CHAT_MODEL = "gemini-2.5-flash"
+
+# DeepSeek chat fallback — disabled until an API key is available.
+# Set to True and uncomment the block in memory_agent/google/chat_model.py.
+DEEPSEEK_ENABLED = False
 
 PDF_PAGES_PER_CHUNK = 6
 MAX_VIDEO_SECONDS = 120
@@ -36,15 +41,10 @@ CONFIG_ALIASES: dict[str, list[str]] = {
     "PINECONE_INDEX_NAME": ["PINECONE_INDEX_NAME"],
     "PINECONE_MEMORY_INDEX_NAME": ["PINECONE_MEMORY_INDEX_NAME"],
     "GEMINI_MULTIMODAL_MODEL": ["GEMINI_MULTIMODAL_MODEL"],
+    "GEMINI_CHAT_MODEL": ["GEMINI_CHAT_MODEL"],
+    "GOOGLE_CREDENTIALS_PATH": ["GOOGLE_CREDENTIALS_PATH", "GOOGLE_APPLICATION_CREDENTIALS"],
+    "GOOGLE_VERTEX_LOCATION": ["GOOGLE_VERTEX_LOCATION"],
 }
-
-REQUIRED_CONFIG_KEYS = [
-    "GEMINI_API_KEY",
-    "DEEPSEEK_API_KEY",
-    "PINECONE_API_KEY",
-    "PINECONE_INDEX_NAME",
-    "PINECONE_MEMORY_INDEX_NAME",
-]
 
 
 def _read_streamlit_secret(key: str) -> str | None:
@@ -82,14 +82,37 @@ def get_config_value(key: str) -> str:
     )
 
 
+def has_deepseek_api_key() -> bool:
+    try:
+        get_config_value("DEEPSEEK_API_KEY")
+        return True
+    except ValueError:
+        return False
+
+
+def has_google_auth() -> bool:
+    from memory_agent.google.credentials import has_google_auth as _has_google_auth
+
+    return _has_google_auth()
+
+
 def get_missing_config_keys() -> list[str]:
     """Return required config keys that are not currently set."""
     missing: list[str] = []
-    for key in REQUIRED_CONFIG_KEYS:
+
+    if not has_google_auth():
+        missing.append("GOOGLE_CREDENTIALS (Streamlit secrets, JSON file, or GEMINI_API_KEY)")
+
+    # DeepSeek optional while DEEPSEEK_ENABLED is False:
+    # if DEEPSEEK_ENABLED and not has_deepseek_api_key():
+    #     missing.append("DEEPSEEK_API_KEY")
+
+    for key in ("PINECONE_API_KEY", "PINECONE_INDEX_NAME", "PINECONE_MEMORY_INDEX_NAME"):
         try:
             get_config_value(key)
         except ValueError:
             missing.append(key)
+
     return missing
 
 
@@ -99,3 +122,11 @@ def get_gemini_multimodal_model() -> str:
         return get_config_value("GEMINI_MULTIMODAL_MODEL")
     except ValueError:
         return GEMINI_MULTIMODAL_MODEL
+
+
+def get_gemini_chat_model() -> str:
+    """Resolve chat model from config with a stable default."""
+    try:
+        return get_config_value("GEMINI_CHAT_MODEL")
+    except ValueError:
+        return GEMINI_CHAT_MODEL

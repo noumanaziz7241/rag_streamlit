@@ -7,6 +7,8 @@ from typing import Any, Dict, List
 
 import streamlit as st
 
+from memory_agent.utils.sources import consolidate_sources_for_display, display_filename
+
 TOOL_ICONS = {
     "save_memory": "💾",
     "recall_memory": "🧠",
@@ -28,22 +30,26 @@ def render_tool_transparency(tools_used: List[Dict[str, Any]]) -> None:
 
 
 def render_citations(sources: List[Dict[str, Any]]) -> None:
-    """Show retrieved source documents with previews."""
+    """Show retrieved documents as a compact reference list."""
     if not sources:
         return
 
-    with st.expander(f"Sources ({len(sources)})", expanded=False):
-        for index, source in enumerate(sources, start=1):
-            filename = source.get("source", "unknown")
+    display_sources = consolidate_sources_for_display(sources)
+    doc_count = len({item.get("source", "") for item in display_sources})
+
+    with st.expander(f"References ({doc_count})", expanded=False):
+        for index, source in enumerate(display_sources, start=1):
+            filename = display_filename(source.get("source", "unknown"))
             modality = source.get("modality", "text")
-            chunk_index = source.get("chunk_index", 0)
             preview = source.get("preview", "")
 
-            st.markdown(
-                f"**[{index}] {filename}** · `{modality}` · chunk {chunk_index}"
-            )
+            st.markdown(f"**{index}. {filename}**")
+            meta_bits = [modality]
+            if source.get("chunk_index") is not None:
+                meta_bits.append(f"section {int(source['chunk_index']) + 1}")
+            st.caption(" · ".join(meta_bits))
             if preview:
-                st.caption(preview)
+                st.markdown(f"> {preview}")
 
             storage_path = source.get("storage_path")
             if modality == "image" and storage_path and Path(storage_path).exists():

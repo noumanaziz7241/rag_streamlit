@@ -163,6 +163,7 @@ class DomainVectorIndex:
         k: int = 8,
         fetch_k: int = 24,
         lambda_mult: float = 0.6,
+        min_score: float = 0.0,
     ) -> Tuple[str, List[Document]]:
         query_vector = self.embedding_client.embed_query(query)
         response = self.index.query(
@@ -188,11 +189,14 @@ class DomainVectorIndex:
             })
 
         selected = self._mmr_select(query_vector, candidates, k=k, lambda_mult=lambda_mult)
+        if min_score > 0:
+            selected = [item for item in selected if item["score"] >= min_score]
         documents: List[Document] = []
         blocks: List[str] = []
 
         for item in selected:
-            metadata = item["metadata"]
+            metadata = dict(item["metadata"])
+            metadata["relevance_score"] = item["score"]
             content = self.multimodal_client.enrich_metadata(metadata)
             source = metadata.get("source", "unknown")
             modality = metadata.get("modality", "text")
