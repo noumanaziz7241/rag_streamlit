@@ -1,6 +1,7 @@
 streamlit
 tiktoken
 langchain-core
+langchain-text-splitters
 langgraph
 langchain-pinecone
 pinecone
@@ -8,3 +9,4 @@ langchain-deepseek
 python-dotenv
 langchain-google-genai
 langgraph.checkpoint.sqlite
+pypdf
