@@ -14,6 +14,56 @@ from memory_agent.rag.multimodal import GeminiMultimodalClient
 from memory_agent.rag.types import RagChunk
 
 
+def cosine_similarity(a: List[float], b: List[float]) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def mmr_select(
+    query_vector: List[float],
+    candidates: List[Dict[str, Any]],
+    k: int,
+    lambda_mult: float,
+) -> List[Dict[str, Any]]:
+    """Maximal Marginal Relevance selection over vector candidates."""
+    if not candidates:
+        return []
+
+    selected: List[Dict[str, Any]] = []
+    remaining = candidates.copy()
+
+    while remaining and len(selected) < k:
+        best_score = float("-inf")
+        best_item = None
+
+        for item in remaining:
+            relevance = item["score"]
+            if not selected:
+                mmr_score = relevance
+            else:
+                diversity = max(
+                    cosine_similarity(item["vector"], chosen["vector"])
+                    for chosen in selected
+                )
+                mmr_score = lambda_mult * relevance - (1 - lambda_mult) * diversity
+            if mmr_score > best_score:
+                best_score = mmr_score
+                best_item = item
+
+        if best_item is None:
+            break
+        selected.append(best_item)
+        remaining.remove(best_item)
+
+    return selected
+
+
 class DomainVectorIndex:
     """Indexes and retrieves multimodal chunks with gemini-embedding-2."""
 
@@ -91,6 +141,13 @@ class DomainVectorIndex:
         self.index.upsert(vectors=vectors, namespace=NAMESPACE)
         return len(vectors)
 
+    def delete_by_doc_id(self, doc_id: str) -> None:
+        """Remove all vectors belonging to a document."""
+        self.index.delete(
+            filter={"doc_id": {"$eq": doc_id}},
+            namespace=NAMESPACE,
+        )
+
     def _mmr_select(
         self,
         query_vector: List[float],
@@ -98,36 +155,7 @@ class DomainVectorIndex:
         k: int,
         lambda_mult: float,
     ) -> List[Dict[str, Any]]:
-        if not candidates:
-            return []
-
-        selected: List[Dict[str, Any]] = []
-        remaining = candidates.copy()
-
-        while remaining and len(selected) < k:
-            best_score = float("-inf")
-            best_item = None
-
-            for item in remaining:
-                relevance = item["score"]
-                if not selected:
-                    mmr_score = relevance
-                else:
-                    diversity = max(
-                        _cosine_similarity(item["vector"], chosen["vector"])
-                        for chosen in selected
-                    )
-                    mmr_score = lambda_mult * relevance - (1 - lambda_mult) * diversity
-                if mmr_score > best_score:
-                    best_score = mmr_score
-                    best_item = item
-
-            if best_item is None:
-                break
-            selected.append(best_item)
-            remaining.remove(best_item)
-
-        return selected
+        return mmr_select(query_vector, candidates, k, lambda_mult)
 
     def search(
         self,
@@ -182,14 +210,3 @@ class DomainVectorIndex:
             )
 
         return "\n\n---\n\n".join(blocks), documents
-
-
-def _cosine_similarity(a: List[float], b: List[float]) -> float:
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = sum(x * x for x in a) ** 0.5
-    norm_b = sum(x * x for x in b) ** 0.5
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return dot / (norm_a * norm_b)

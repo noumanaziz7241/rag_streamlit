@@ -6,6 +6,8 @@ import streamlit as st
 
 from memory_agent.config import NAMESPACE
 
+from app.ui.documents import render_document_manager
+
 
 def render_sidebar() -> None:
     """Render session controls and document ingestion."""
@@ -79,6 +81,8 @@ def render_sidebar() -> None:
         st.markdown("### Knowledge Base")
         st.caption(f"Namespace: `{NAMESPACE}`")
 
+        render_document_manager()
+
         uploaded_files = st.file_uploader(
             "Upload files (any format)",
             accept_multiple_files=True,
@@ -90,13 +94,23 @@ def render_sidebar() -> None:
 
         if uploaded_files and st.button("Index documents", use_container_width=True):
             total_chunks = 0
+            skipped = 0
             with st.spinner("Chunking and indexing documents..."):
                 for uploaded in uploaded_files:
-                    total_chunks += st.session_state.chat_api.ingest_file(
+                    result = st.session_state.chat_api.ingest_file_detailed(
                         uploaded.name,
                         uploaded.getvalue(),
                     )
-            st.success(f"Indexed {total_chunks} chunks from {len(uploaded_files)} file(s).")
+                    if result.skipped:
+                        skipped += 1
+                    else:
+                        total_chunks += result.chunks
+            if total_chunks:
+                st.success(f"Indexed {total_chunks} chunks from {len(uploaded_files) - skipped} file(s).")
+            if skipped:
+                st.info(f"Skipped {skipped} unchanged file(s) already in the knowledge base.")
+            if not total_chunks and not skipped:
+                st.warning("No chunks were indexed.")
 
         st.divider()
         st.markdown("### Agent Capabilities")

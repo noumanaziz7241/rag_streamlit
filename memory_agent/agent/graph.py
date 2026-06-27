@@ -17,6 +17,7 @@ from langgraph.prebuilt import ToolNode
 
 from memory_agent.agent.tools import MemoryTools
 from memory_agent.config import DEFAULT_SESSION_ID, DEFAULT_USER_ID, get_config_value
+from memory_agent.documents.registry import DocumentRegistry
 from memory_agent.models import SourceCitation
 from memory_agent.rag.pipeline import ingest_file
 from memory_agent.vectorstore.manager import VectorStoreManager
@@ -44,6 +45,7 @@ class MemoryAgent:
         self.vector_store_manager = VectorStoreManager()
         self.memory_tools = MemoryTools(self.vector_store_manager)
         self.tools = self.memory_tools.create_tools()
+        self.document_registry = DocumentRegistry(db_path)
         self.tokenizer = tiktoken.encoding_for_model("gpt-4o-mini")
         self.checkpointer: Optional[SqliteSaver] = None
 
@@ -307,9 +309,25 @@ class MemoryAgent:
         if self.checkpointer is not None:
             self.checkpointer.delete_thread(session_id)
 
-    def ingest_uploaded_file(self, filename: str, raw_bytes: bytes) -> int:
+    def ingest_uploaded_file(self, filename: str, raw_bytes: bytes) -> tuple[int, bool]:
         """Chunk and index an uploaded file into the domain vector store."""
-        return ingest_file(self.vector_store_manager.domain_index, filename, raw_bytes)
+        return ingest_file(
+            self.vector_store_manager.domain_index,
+            filename,
+            raw_bytes,
+            registry=self.document_registry,
+        )
+
+    def list_documents(self):
+        return self.document_registry.list_documents()
+
+    def delete_document(self, doc_id: str) -> bool:
+        document = self.document_registry.get(doc_id)
+        if document is None:
+            return False
+        self.vector_store_manager.domain_index.delete_by_doc_id(doc_id)
+        self.document_registry.delete(doc_id)
+        return True
 
     @staticmethod
     def _chunk_text(content: Any) -> str:

@@ -10,6 +10,8 @@
 
 A Streamlit chat application powered by LangGraph that combines conversational memory, domain knowledge retrieval (RAG), and persistent multi-session chat history. The agent remembers user-specific facts, retrieves chunked domain documents with MMR search, and keeps each conversation in its own checkpointed thread.
 
+[![CI](https://github.com/noumanaziz7241/rag_streamlit/actions/workflows/ci.yml/badge.svg)](https://github.com/noumanaziz7241/rag_streamlit/actions/workflows/ci.yml)
+
 ## Features
 
 - **Multi-session chat** — Create, switch, clear, and delete conversations; each session has isolated history
@@ -17,6 +19,7 @@ A Streamlit chat application powered by LangGraph that combines conversational m
 - **Streaming responses** — Assistant replies stream token-by-token while the agent runs
 - **Source citations** — Retrieved documents appear in an expandable **Sources** panel with filename, modality, chunk index, preview text, and image thumbnails
 - **Tool transparency** — Expandable **Agent tools** panel shows when `save_memory`, `recall_memory`, or `retrieve_domain` ran and what they returned
+- **Document management** — List, deduplicate, and delete indexed files from the knowledge base UI
 - **Conversational memory** — Stores and recalls user-specific facts via a dedicated Pinecone memory index (filtered by user + session)
 - **Multimodal RAG** — [Gemini Embedding 2](https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2) indexes text, PDF, images, audio, and video in a unified vector space; [Gemini Flash](https://ai.google.dev/gemini-api/docs/models) interprets retrieved media for the chat LLM
 - **Tool-augmented agent** — DeepSeek model with `save_memory`, `recall_memory`, and `retrieve_domain` tools
@@ -33,11 +36,14 @@ rag_streamlit/
 │       ├── chat.py               # Chat interface (streaming + citations)
 │       ├── message_render.py     # Tool transparency + source citation UI
 │       ├── sidebar.py            # Sessions + document upload
+│       ├── documents.py          # Knowledge-base document manager
 │       └── state.py              # Streamlit session state helpers
 ├── memory_agent/                 # Core package
 │   ├── api.py                    # ChatAPI facade
 │   ├── config.py                 # Constants and configuration
 │   ├── models.py                 # ChatRequest, ChatResponse
+│   ├── documents/
+│   │   └── registry.py           # Indexed document metadata (SQLite)
 │   ├── agent/
 │   │   ├── graph.py              # LangGraph MemoryAgent
 │   │   └── tools.py              # save_memory, recall_memory, retrieve_domain
@@ -55,10 +61,25 @@ rag_streamlit/
 │       └── manager.py            # Pinecone domain + memory stores
 ├── assets/
 │   └── demo.gif                  # README demo animation
+├── docs/
+│   ├── DEPLOY.md                 # Docker + Streamlit Cloud deployment
+│   └── PORTFOLIO_ROADMAP.md       # Portfolio improvement guide
+├── evals/
+│   ├── corpus/                   # Fixed eval corpus
+│   ├── golden_qa.json            # Golden Q&A set
+│   ├── metrics.py                # recall@k + faithfulness metrics
+│   └── run_eval.py               # Evaluation runner
+├── sample_data/                  # Demo files for live showcase
+├── tests/                        # Pytest suite
+├── .github/workflows/ci.yml      # GitHub Actions CI
+├── Dockerfile
+├── docker-compose.yml
+├── deploy.sh                     # One-command Docker deploy
 ├── scripts/
 │   └── generate_demo_gif.py      # Regenerate demo GIF
 ├── streamlit_chat.py             # Backward-compatible entry point
 ├── requirements.txt
+├── requirements-dev.txt
 ├── .env.example
 └── chat_memory.db                # Checkpoints + session metadata (runtime)
 ```
@@ -126,7 +147,25 @@ PINECONE_MEMORY_INDEX_NAME = "your-memory-index-name"
 
 Keys can also be set in a `.env` file as a fallback.
 
-## Running the App
+## Quick start (one command)
+
+```bash
+cp .env.example .env   # add API keys
+chmod +x deploy.sh
+./deploy.sh
+```
+
+Opens at [http://localhost:8501](http://localhost:8501). See [docs/DEPLOY.md](docs/DEPLOY.md) for Streamlit Cloud and manual setup.
+
+## Live demo
+
+Deploy to [Streamlit Community Cloud](https://share.streamlit.io) with main file `app/main.py` and secrets from `.streamlit/secrets.toml.example`. Add your live URL here after deploying:
+
+```
+https://YOUR-APP-NAME.streamlit.app
+```
+
+## Running the App (development)
 
 ```bash
 streamlit run app/main.py
@@ -194,6 +233,17 @@ python scripts/generate_demo_gif.py
 ```
 
 For a live screen capture, record the app with [Peek](https://github.com/phw/peek) or [LICEcap](https://www.cockos.com/licecap/), then save as `assets/demo.gif`.
+
+## Testing & evaluation
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+python evals/run_eval.py
+python evals/run_eval.py --live-chat --output evals/results.json
+```
+
+CI runs automatically on push/PR via GitHub Actions.
 
 ## Key Modules
 

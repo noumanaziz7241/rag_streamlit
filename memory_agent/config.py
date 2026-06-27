@@ -15,7 +15,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 NAMESPACE = "polaris"
 DEFAULT_USER_ID = "default_user"
 DEFAULT_SESSION_ID = "main_session"
-DEFAULT_DB_PATH = str(PROJECT_ROOT / "chat_memory.db")
+DEFAULT_DB_PATH = os.getenv("CHAT_DB_PATH", str(PROJECT_ROOT / "chat_memory.db"))
 UPLOADS_DIR = str(PROJECT_ROOT / "data" / "uploads")
 
 # Latest Gemini embedding model — natively multimodal (text, image, video, audio, PDF).
