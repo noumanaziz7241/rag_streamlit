@@ -1,0 +1,32 @@
+[
+  {
+    "id": "architecture",
+    "question": "What agent framework does Memory Agent Chat use?",
+    "expected_source": "memory_agent_overview.md",
+    "expected_keywords": ["LangGraph", "agent"]
+  },
+  {
+    "id": "embeddings",
+    "question": "Which embedding model indexes the documents?",
+    "expected_source": "memory_agent_overview.md",
+    "expected_keywords": ["gemini-embedding-2", "Gemini"]
+  },
+  {
+    "id": "vector_store",
+    "question": "What vector database stores domain knowledge?",
+    "expected_source": "memory_agent_overview.md",
+    "expected_keywords": ["Pinecone"]
+  },
+  {
+    "id": "modalities",
+    "question": "What file types can be indexed?",
+    "expected_source": "memory_agent_overview.md",
+    "expected_keywords": ["PDF", "audio", "video"]
+  },
+  {
+    "id": "memory",
+    "question": "How does the app persist chat sessions?",
+    "expected_source": "memory_agent_overview.md",
+    "expected_keywords": ["SQLite", "checkpoint"]
+  }
+]

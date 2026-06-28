@@ -5,11 +5,14 @@ langchain-text-splitters
 langgraph
 langchain-pinecone
 pinecone
+# langchain-deepseek  # optional — DeepSeek fallback is commented out in chat_model.py
 langchain-deepseek
 python-dotenv
 langchain-google-genai
 langgraph.checkpoint.sqlite
 google-genai
+google-auth
+google-auth-oauthlib
 pypdf
 python-docx
 openpyxl

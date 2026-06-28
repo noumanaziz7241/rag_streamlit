@@ -6,19 +6,54 @@ from typing import List, Sequence, Tuple
 
 from langchain_core.documents import Document
 
+from memory_agent.documents.registry import DocumentRegistry, content_hash
 from memory_agent.rag.loaders import load_uploaded_file
 from memory_agent.rag.types import RagChunk
 from memory_agent.vectorstore.domain_index import DomainVectorIndex
 
-RETRIEVAL_K = 8
-RETRIEVAL_FETCH_K = 24
-MMR_LAMBDA = 0.6
+RETRIEVAL_K = 6
+RETRIEVAL_FETCH_K = 20
+MMR_LAMBDA = 0.65
+MIN_RELEVANCE_SCORE = 0.40
 
 
-def ingest_file(index: DomainVectorIndex, filename: str, raw_bytes: bytes) -> int:
-    """Load, embed, and index an uploaded file."""
+def ingest_file(
+    index: DomainVectorIndex,
+    filename: str,
+    raw_bytes: bytes,
+    registry: DocumentRegistry | None = None,
+) -> Tuple[int, bool]:
+    """Load, embed, and index an uploaded file.
+
+    Returns (chunk_count, skipped). Skipped is True when an identical file is already indexed.
+    """
+    file_hash = content_hash(raw_bytes)
+    if registry is not None and registry.is_duplicate(filename, file_hash):
+        return 0, True
+
     chunks = load_uploaded_file(filename, raw_bytes)
-    return index.upsert_chunks(chunks)
+    if not chunks:
+        return 0, False
+
+    if registry is not None:
+        existing = registry.get_by_source(filename)
+        if existing is not None and existing.content_hash != file_hash:
+            index.delete_by_doc_id(existing.doc_id)
+            registry.delete(existing.doc_id)
+
+    count = index.upsert_chunks(chunks)
+    if registry is not None and count:
+        doc_id = chunks[0].metadata.get("doc_id", chunks[0].chunk_id)
+        modality = chunks[0].modality
+        registry.register(
+            doc_id=str(doc_id),
+            source=filename,
+            modality=modality,
+            chunk_count=count,
+            file_hash=file_hash,
+        )
+
+    return count, False
 
 
 def ingest_chunks(index: DomainVectorIndex, chunks: Sequence[RagChunk]) -> int:
@@ -35,4 +70,5 @@ def retrieve_domain_documents(
         k=RETRIEVAL_K,
         fetch_k=RETRIEVAL_FETCH_K,
         lambda_mult=MMR_LAMBDA,
+        min_score=MIN_RELEVANCE_SCORE,
     )

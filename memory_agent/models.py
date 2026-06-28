@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+@dataclass
+class IngestResult:
+    chunks: int
+    skipped: bool
+    source: str
 
 
 @dataclass
@@ -20,3 +27,39 @@ class ChatResponse:
     session_id: str
     success: bool
     error: Optional[str] = None
+    tools_used: List[Dict[str, Any]] = field(default_factory=list)
+    sources: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class SourceCitation:
+    source: str
+    modality: str
+    chunk_index: int
+    preview: str
+    storage_path: Optional[str] = None
+    relevance_score: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source": self.source,
+            "modality": self.modality,
+            "chunk_index": self.chunk_index,
+            "preview": self.preview,
+            "storage_path": self.storage_path,
+            "relevance_score": self.relevance_score,
+        }
+
+
+@dataclass
+class ToolActivity:
+    tool: str
+    summary: str
+    input: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "tool": self.tool,
+            "summary": self.summary,
+            "input": self.input,
+        }

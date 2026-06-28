@@ -24,9 +24,10 @@ htmlcov/
 .tox/
 .nox/
 
-# Streamlit (keep example secrets tracked)
+# Streamlit (keep example secrets + config tracked)
 .streamlit/*
 !.streamlit/secrets.toml.example
+!.streamlit/config.toml
 
 # Local databases
 *.db*
@@ -44,5 +45,12 @@ meili_data_v1.12/
 *.swo
 .DS_Store
 Thumbs.db
-*.json
-docs/
+
+# Eval output
+evals/results.json
+
+# Google OAuth / credentials (never commit secrets)
+google_client_secret.json
+google_token.json
+*-credentials.json
+service-account*.json
