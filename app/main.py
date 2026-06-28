@@ -18,7 +18,7 @@ from app.ui.config_setup import ensure_configured, render_config_setup
 from app.ui.sidebar import render_sidebar
 from app.ui.state import initialize_session_state, sync_messages_from_checkpoint
 from memory_agent.api import ChatAPI
-from memory_agent.config import AUTO_INDEX_SAMPLE_CORPUS, DEFAULT_DB_PATH
+from memory_agent.config import auto_index_sample_corpus_enabled, DEFAULT_DB_PATH
 
 
 def main() -> None:
@@ -55,11 +55,15 @@ def main() -> None:
         with st.spinner("Initializing chat agent..."):
             st.session_state.chat_api = ChatAPI(db_path=DEFAULT_DB_PATH)
 
-    if AUTO_INDEX_SAMPLE_CORPUS and not st.session_state.get("sample_corpus_bootstrapped"):
-        st.session_state.sample_corpus_bootstrapped = True
+    if auto_index_sample_corpus_enabled() and not st.session_state.get("sample_corpus_bootstrapped"):
         if not st.session_state.chat_api.sample_corpus_is_indexed():
             with st.spinner("Indexing sample corpus for demo…"):
-                st.session_state.chat_api.index_sample_corpus()
+                try:
+                    st.session_state.chat_api.index_sample_corpus()
+                    st.session_state.sample_corpus_index_error = None
+                except Exception as exc:
+                    st.session_state.sample_corpus_index_error = str(exc)
+        st.session_state.sample_corpus_bootstrapped = True
 
     render_sidebar()
     sync_messages_from_checkpoint()

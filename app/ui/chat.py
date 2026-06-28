@@ -60,6 +60,12 @@ def _render_live_tools(tools_used: List[Dict[str, Any]]) -> str:
 
 def _stream_assistant_response(prompt: str) -> None:
     """Stream the assistant response with live tool and citation updates."""
+    if not st.session_state.chat_api.list_documents():
+        st.warning(
+            "Knowledge base is empty. Click **Index sample corpus** in the sidebar, "
+            "then ask your question again."
+        )
+
     status_placeholder = st.empty()
     tools_placeholder = st.empty()
     response_placeholder = st.empty()
@@ -129,6 +135,14 @@ def _stream_assistant_response(prompt: str) -> None:
 
             status_placeholder.empty()
             tools_placeholder.empty()
+
+            if not full_response.strip():
+                full_response = (
+                    "I couldn't generate a reply. If this was a document question, "
+                    "click **Index sample corpus** in the sidebar first, then try again."
+                )
+                st.warning("Empty agent response — see message below.")
+
             response_placeholder.markdown(full_response)
 
             with meta_placeholder:

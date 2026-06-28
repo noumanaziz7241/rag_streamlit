@@ -193,7 +193,15 @@ class DomainVectorIndex:
             metadata = dict(item["metadata"])
             metadata["relevance_score"] = item["score"]
             metadata["citation_index"] = citation_index
-            content = self.multimodal_client.enrich_metadata(metadata)
+            try:
+                content = self.multimodal_client.enrich_metadata(metadata)
+            except OSError:
+                content = str(metadata.get("text_preview") or "").strip() or (
+                    f"Content from {metadata.get('source', 'unknown')}"
+                )
+            except Exception as exc:
+                preview = str(metadata.get("text_preview") or "").strip()
+                content = preview or f"Could not load chunk content ({exc})"
             source = metadata.get("source", "unknown")
             modality = metadata.get("modality", "text")
             blocks.append(

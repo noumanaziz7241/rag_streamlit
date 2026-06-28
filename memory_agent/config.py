@@ -12,11 +12,59 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Load .env from the repository root regardless of Streamlit's working directory.
 load_dotenv(PROJECT_ROOT / ".env")
 
+
+def is_streamlit_cloud() -> bool:
+    """True when running on Streamlit Community Cloud."""
+    runtime = os.getenv("STREAMLIT_RUNTIME_ENVIRONMENT", "").lower()
+    return runtime in {"cloud", "streamlit-cloud", "space"}
+
+
+def _path_is_writable(directory: Path) -> bool:
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
+def resolve_db_path() -> str:
+    """Pick a writable SQLite path (Streamlit Cloud cannot write to a read-only repo mount)."""
+    explicit = os.getenv("CHAT_DB_PATH")
+    if explicit and explicit.strip():
+        return explicit.strip()
+
+    preferred = PROJECT_ROOT / "chat_memory.db"
+    if _path_is_writable(preferred.parent):
+        return str(preferred)
+
+    fallback = Path("/tmp/memory_agent/chat_memory.db")
+    _path_is_writable(fallback.parent)
+    return str(fallback)
+
+
+def resolve_uploads_dir() -> str:
+    """Pick a writable uploads directory for media chunks."""
+    explicit = os.getenv("UPLOADS_DIR")
+    if explicit and explicit.strip():
+        return explicit.strip()
+
+    preferred = PROJECT_ROOT / "data" / "uploads"
+    if _path_is_writable(preferred):
+        return str(preferred)
+
+    fallback = Path("/tmp/memory_agent/uploads")
+    _path_is_writable(fallback)
+    return str(fallback)
+
+
 NAMESPACE = "polaris"
 DEFAULT_USER_ID = "default_user"
 DEFAULT_SESSION_ID = "main_session"
-DEFAULT_DB_PATH = os.getenv("CHAT_DB_PATH", str(PROJECT_ROOT / "chat_memory.db"))
-UPLOADS_DIR = str(PROJECT_ROOT / "data" / "uploads")
+DEFAULT_DB_PATH = resolve_db_path()
+UPLOADS_DIR = resolve_uploads_dir()
 SAMPLE_DATA_DIR = PROJECT_ROOT / "sample_data"
 
 
@@ -28,6 +76,14 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
 
 AUTO_INDEX_SAMPLE_CORPUS = _env_flag("AUTO_INDEX_SAMPLE_CORPUS")
+
+
+def auto_index_sample_corpus_enabled() -> bool:
+    """Default on for Streamlit Cloud so the live demo works without manual indexing."""
+    raw = os.getenv("AUTO_INDEX_SAMPLE_CORPUS")
+    if raw is not None and str(raw).strip():
+        return _env_flag("AUTO_INDEX_SAMPLE_CORPUS")
+    return is_streamlit_cloud()
 
 # Latest Gemini embedding model — natively multimodal (text, image, video, audio, PDF).
 GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"

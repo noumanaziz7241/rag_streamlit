@@ -82,18 +82,33 @@ def render_sidebar() -> None:
         st.markdown("### Sample corpus")
         st.caption("Bundled demo docs in `sample_data/` — no upload needed.")
 
+        doc_count = len(st.session_state.chat_api.list_documents())
+        if doc_count == 0:
+            st.warning("No documents indexed yet — click below before asking RAG questions.")
+
+        index_error = st.session_state.get("sample_corpus_index_error")
+        if index_error:
+            st.error(f"Auto-index failed: {index_error}")
+
         if st.button("Index sample corpus", use_container_width=True):
             with st.spinner("Indexing sample corpus…"):
-                summary = st.session_state.chat_api.index_sample_corpus()
-            if summary.indexed_chunks:
-                st.success(
-                    f"Indexed {summary.indexed_chunks} chunks from "
-                    f"{summary.indexed_files} file(s)."
-                )
-            elif summary.skipped_files:
-                st.info("Sample corpus already indexed (unchanged files skipped).")
-            else:
-                st.warning("No sample files were indexed.")
+                try:
+                    summary = st.session_state.chat_api.index_sample_corpus()
+                    st.session_state.sample_corpus_index_error = None
+                except Exception as exc:
+                    st.error(f"Indexing failed: {exc}")
+                    summary = None
+            if summary is not None:
+                if summary.indexed_chunks:
+                    st.success(
+                        f"Indexed {summary.indexed_chunks} chunks from "
+                        f"{summary.indexed_files} file(s)."
+                    )
+                    st.rerun()
+                elif summary.skipped_files:
+                    st.info("Sample corpus already indexed (unchanged files skipped).")
+                else:
+                    st.warning("No sample files were indexed.")
 
         st.divider()
         st.markdown("### Knowledge Base")
