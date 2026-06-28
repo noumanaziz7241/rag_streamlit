@@ -65,12 +65,38 @@ def _read_streamlit_secret(key: str) -> str | None:
     try:
         import streamlit as st
 
-        if hasattr(st, "secrets") and key in st.secrets:
+        if not hasattr(st, "secrets"):
+            return None
+
+        try:
+            if key not in st.secrets:
+                return None
             value = st.secrets[key]
-            if value is not None and str(value).strip():
-                return str(value).strip()
+        except (KeyError, TypeError):
+            return None
+        except Exception as exc:
+            # Invalid secrets TOML on Streamlit Cloud surfaces on access.
+            if "Secrets" in str(exc) or "TOML" in str(exc):
+                raise
+            return None
+
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
     except Exception:
-        pass
+        return None
+
+
+def read_secret_optional(key: str) -> str | None:
+    """Read a secret from Streamlit or environment without raising."""
+    for candidate in CONFIG_ALIASES.get(key, [key]):
+        secret_value = _read_streamlit_secret(candidate)
+        if secret_value:
+            return secret_value
+        env_value = os.getenv(candidate)
+        if env_value and env_value.strip():
+            return env_value.strip()
     return None
 
 

@@ -182,6 +182,7 @@ def _prefer_api_key() -> bool:
 def resolve_google_auth() -> GoogleAuthConfig:
     """Resolve Google auth for embeddings, multimodal, and chat models."""
     api_key = _load_api_key()
+
     if _prefer_api_key():
         if api_key:
             return GoogleAuthConfig(mode="api_key", api_key=api_key)
@@ -189,21 +190,17 @@ def resolve_google_auth() -> GoogleAuthConfig:
             "GOOGLE_AUTH_MODE=api_key is set but GEMINI_API_KEY / GOOGLE_API_KEY is missing."
         )
 
-    credentials_data = _load_credentials_dict()
-    if credentials_data is not None:
-        try:
-            return _load_credentials_from_data(credentials_data)
-        except ValueError:
-            if api_key:
-                return GoogleAuthConfig(mode="api_key", api_key=api_key)
-            raise
-
+    # Prefer API key when set — avoids broken partial OAuth blocks in Streamlit secrets.
     if api_key:
         return GoogleAuthConfig(mode="api_key", api_key=api_key)
 
+    credentials_data = _load_credentials_dict()
+    if credentials_data is not None:
+        return _load_credentials_from_data(credentials_data)
+
     raise ValueError(
         "Google credentials not configured. Provide one of:\n"
-        "  • `GEMINI_API_KEY` / `GOOGLE_API_KEY` in secrets or `.env` (simplest)\n"
+        "  • `GEMINI_API_KEY` / `GOOGLE_API_KEY` in Streamlit secrets (recommended)\n"
         f"  • Streamlit secrets: `[google_service_account]` or `[google_client_secret]` + `[google_token]`\n"
         f"  • Local file: `{DEFAULT_CREDENTIALS_FILENAME}` + `{DEFAULT_TOKEN_FILENAME}`"
     )

@@ -19,11 +19,13 @@ def test_get_credentials_path_finds_default_file(tmp_path, monkeypatch):
 
 
 def test_resolve_api_key_when_no_credentials_file(monkeypatch):
-    monkeypatch.delenv("GOOGLE_CREDENTIALS_PATH", raising=False)
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(
         "memory_agent.google.credentials.get_credentials_path",
         lambda: None,
+    )
+    monkeypatch.setattr(
+        "memory_agent.google.credentials._load_api_key",
+        lambda: "test-key",
     )
     auth = resolve_google_auth()
     assert auth.mode == "api_key"
@@ -37,7 +39,10 @@ def test_resolve_api_key_when_oauth_client_missing_token(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setenv("GOOGLE_CREDENTIALS_PATH", str(creds_file))
-    monkeypatch.setenv("GEMINI_API_KEY", "fallback-key")
+    monkeypatch.setattr(
+        "memory_agent.google.credentials._load_api_key",
+        lambda: "fallback-key",
+    )
     auth = resolve_google_auth()
     assert auth.mode == "api_key"
     assert auth.api_key == "fallback-key"
