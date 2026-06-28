@@ -125,12 +125,7 @@ class DomainVectorIndex:
             if chunk.has_media:
                 extension = chunk.mime_type.split("/")[-1]
                 storage_path = self.media_store.save(chunk.chunk_id, chunk.media_bytes, extension)
-            elif chunk.modality == "text" and chunk.text:
-                storage_path = self.media_store.save(
-                    chunk.chunk_id,
-                    chunk.text.encode("utf-8"),
-                    "txt",
-                )
+            # Text chunks: content is stored in Pinecone text_preview — no local file (cloud-safe).
 
             vectors.append({
                 "id": chunk.chunk_id,

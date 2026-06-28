@@ -7,6 +7,7 @@ import streamlit as st
 from memory_agent.config import NAMESPACE
 
 from app.ui.documents import render_document_manager
+from memory_agent.version import APP_VERSION
 
 
 def render_sidebar() -> None:
@@ -141,3 +142,4 @@ def render_sidebar() -> None:
             - **RAG**: Multimodal retrieval (text, image, audio, video, PDF) via Gemini Embedding 2
             """
         )
+        st.caption(f"Build {APP_VERSION}")

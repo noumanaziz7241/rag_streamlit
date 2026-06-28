@@ -11,11 +11,13 @@
 A Streamlit chat application powered by LangGraph that combines conversational memory, domain knowledge retrieval (RAG), and persistent multi-session chat history. The agent remembers user-specific facts, retrieves chunked domain documents with MMR search, and keeps each conversation in its own checkpointed thread.
 
 [![CI](https://github.com/noumanaziz7241/rag_streamlit/actions/workflows/ci.yml/badge.svg)](https://github.com/noumanaziz7241/rag_streamlit/actions/workflows/ci.yml)
+[![Live Demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ragapp-vjygsngajq3vodxroxft4e.streamlit.app/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
 [![LangGraph](https://img.shields.io/badge/LangGraph-agent-orange)](https://github.com/langchain-ai/langgraph)
 [![Pinecone](https://img.shields.io/badge/Pinecone-vector%20DB-000000)](https://www.pinecone.io)
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=noumanaziz7241/rag_streamlit&branch=main&mainPath=app/main.py)
+
+**Try it live:** [ragapp-vjygsngajq3vodxroxft4e.streamlit.app](https://ragapp-vjygsngajq3vodxroxft4e.streamlit.app/)
 
 ## Features
 
@@ -259,16 +261,11 @@ Four markdown files in `sample_data/` ship with the repo for instant demos:
 
 ## Live demo
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=noumanaziz7241/rag_streamlit&branch=main&mainPath=app/main.py)
+**[Open the app →](https://ragapp-vjygsngajq3vodxroxft4e.streamlit.app/)**
 
-**Deploy your public demo:**
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ragapp-vjygsngajq3vodxroxft4e.streamlit.app/)
 
-1. Fork or use this repo on GitHub
-2. [Streamlit Community Cloud](https://share.streamlit.io) → **New app** → main file `app/main.py`
-3. Add secrets from [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) (include `AUTO_INDEX_SAMPLE_CORPUS = true`)
-4. Replace the URL below with your deployed app:
-
-**Live app:** `https://YOUR-APP-NAME.streamlit.app` *(add after deploy)*
+Pushes to `main` redeploy automatically on [Streamlit Community Cloud](https://share.streamlit.io). To run your own instance, use main file `app/main.py` and secrets from [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) (include `AUTO_INDEX_SAMPLE_CORPUS = true`). See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 Smoke-test prompts: *"What tech stack does Memory Agent Chat use?"* · *"How does MMR retrieval work?"*
 

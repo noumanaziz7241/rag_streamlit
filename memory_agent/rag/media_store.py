@@ -38,15 +38,21 @@ class MediaStore:
         return path.read_bytes()
 
     def try_load(self, storage_path: str) -> bytes | None:
-        if not self.exists(storage_path):
+        try:
+            if not self.exists(storage_path):
+                return None
+            return self.load(storage_path)
+        except OSError:
             return None
-        return self.load(storage_path)
 
     def load_text(self, storage_path: str) -> str:
         path = self.resolve_path(storage_path)
         return path.read_text(encoding="utf-8", errors="ignore")
 
     def try_load_text(self, storage_path: str) -> str | None:
-        if not self.exists(storage_path):
+        try:
+            if not self.exists(storage_path):
+                return None
+            return self.load_text(storage_path)
+        except OSError:
             return None
-        return self.load_text(storage_path)
