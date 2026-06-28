@@ -42,20 +42,26 @@ class GeminiMultimodalClient:
         """Build LLM-readable context for a retrieved chunk."""
         source = metadata.get("source", "unknown")
         modality = metadata.get("modality", "text")
-        text_preview = metadata.get("text_preview", "")
+        text_preview = str(metadata.get("text_preview") or "").strip()
+        note = str(metadata.get("note") or "").strip()
 
         if modality == "text":
             storage_path = metadata.get("storage_path")
             if storage_path:
-                return self.media_store.load_text(storage_path)
-            return text_preview
+                loaded = self.media_store.try_load_text(storage_path)
+                if loaded:
+                    return loaded
+            return text_preview or note or f"Text content from {source}"
 
         storage_path = metadata.get("storage_path")
         mime_type = metadata.get("mime_type", "application/octet-stream")
-        if not storage_path:
-            return text_preview or f"{modality} content from {source}"
+        if not storage_path or not self.media_store.exists(storage_path):
+            return text_preview or note or f"{modality} content from {source}"
 
-        data = self.media_store.load(storage_path)
+        data = self.media_store.try_load(storage_path)
+        if data is None:
+            return text_preview or note or f"{modality} content from {source}"
+
         if modality == "pdf":
             return self.describe_media(data, mime_type, source, "PDF document")
         return self.describe_media(data, mime_type, source, modality)
