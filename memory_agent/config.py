@@ -17,12 +17,25 @@ DEFAULT_USER_ID = "default_user"
 DEFAULT_SESSION_ID = "main_session"
 DEFAULT_DB_PATH = os.getenv("CHAT_DB_PATH", str(PROJECT_ROOT / "chat_memory.db"))
 UPLOADS_DIR = str(PROJECT_ROOT / "data" / "uploads")
+SAMPLE_DATA_DIR = PROJECT_ROOT / "sample_data"
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+AUTO_INDEX_SAMPLE_CORPUS = _env_flag("AUTO_INDEX_SAMPLE_CORPUS")
 
 # Latest Gemini embedding model — natively multimodal (text, image, video, audio, PDF).
 GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"
 EMBEDDING_DIMENSION = 768
 GEMINI_MULTIMODAL_MODEL = "gemini-2.5-flash"
 GEMINI_CHAT_MODEL = "gemini-2.5-flash"
+# Used when the primary model returns 503 / capacity errors.
+DEFAULT_GEMINI_MODEL_FALLBACKS = ("gemini-2.0-flash", "gemini-2.0-flash-lite")
 
 # DeepSeek chat fallback — disabled until an API key is available.
 # Set to True and uncomment the block in memory_agent/google/chat_model.py.
@@ -42,6 +55,7 @@ CONFIG_ALIASES: dict[str, list[str]] = {
     "PINECONE_MEMORY_INDEX_NAME": ["PINECONE_MEMORY_INDEX_NAME"],
     "GEMINI_MULTIMODAL_MODEL": ["GEMINI_MULTIMODAL_MODEL"],
     "GEMINI_CHAT_MODEL": ["GEMINI_CHAT_MODEL"],
+    "GEMINI_MODEL_FALLBACKS": ["GEMINI_MODEL_FALLBACKS"],
     "GOOGLE_CREDENTIALS_PATH": ["GOOGLE_CREDENTIALS_PATH", "GOOGLE_APPLICATION_CREDENTIALS"],
     "GOOGLE_VERTEX_LOCATION": ["GOOGLE_VERTEX_LOCATION"],
 }
@@ -130,3 +144,24 @@ def get_gemini_chat_model() -> str:
         return get_config_value("GEMINI_CHAT_MODEL")
     except ValueError:
         return GEMINI_CHAT_MODEL
+
+
+def get_gemini_model_fallbacks() -> list[str]:
+    """Secondary Gemini models when the primary hits capacity limits."""
+    try:
+        raw = get_config_value("GEMINI_MODEL_FALLBACKS")
+    except ValueError:
+        raw = os.getenv("GEMINI_MODEL_FALLBACKS", "")
+
+    if raw and str(raw).strip():
+        return [part.strip() for part in str(raw).split(",") if part.strip()]
+    return list(DEFAULT_GEMINI_MODEL_FALLBACKS)
+
+
+def get_gemini_model_chain(primary: str) -> list[str]:
+    """Primary model first, then configured fallbacks (deduped)."""
+    chain = [primary]
+    for model in get_gemini_model_fallbacks():
+        if model not in chain:
+            chain.append(model)
+    return chain

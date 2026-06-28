@@ -39,9 +39,13 @@ class SourceCitation:
     preview: str
     storage_path: Optional[str] = None
     relevance_score: float = 0.0
+    citation_index: Optional[int] = None
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    total_pages: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload: Dict[str, Any] = {
             "source": self.source,
             "modality": self.modality,
             "chunk_index": self.chunk_index,
@@ -49,6 +53,15 @@ class SourceCitation:
             "storage_path": self.storage_path,
             "relevance_score": self.relevance_score,
         }
+        if self.citation_index is not None:
+            payload["citation_index"] = self.citation_index
+        if self.page_start is not None:
+            payload["page_start"] = self.page_start
+        if self.page_end is not None:
+            payload["page_end"] = self.page_end
+        if self.total_pages is not None:
+            payload["total_pages"] = self.total_pages
+        return payload
 
 
 @dataclass

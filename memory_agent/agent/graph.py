@@ -70,8 +70,9 @@ class MemoryAgent:
                 " * Use recall_memory when incorporating personal info\n"
                 " * Use retrieve_domain for factual or domain knowledge questions\n"
                 " * Ground answers in retrieved documents when available\n"
-                " * Do not paste long excerpts, chunk text, or source lists in your reply\n"
-                " * The UI shows sources separately — keep answers concise and readable\n"
+                " * Cite retrieved documents inline with [1], [2], etc. matching the numbers in the tool output\n"
+                " * Do not paste long excerpts, chunk text, or a separate Sources list in your reply\n"
+                " * Keep answers concise; the UI shows full reference details separately\n"
                 " * After using tools, respond using returned data",
             ),
             ("placeholder", "{messages}"),
@@ -222,6 +223,11 @@ class MemoryAgent:
                 continue
             seen.add(key)
 
+            citation_index = meta.get("citation_index")
+            page_start = meta.get("page_start")
+            page_end = meta.get("page_end")
+            total_pages = meta.get("total_pages")
+
             citation = SourceCitation(
                 source=source,
                 modality=str(meta.get("modality", "text")),
@@ -229,10 +235,15 @@ class MemoryAgent:
                 preview=build_source_preview(meta, doc.page_content or ""),
                 storage_path=meta.get("storage_path"),
                 relevance_score=float(meta.get("relevance_score", 0.0)),
+                citation_index=int(citation_index) if citation_index is not None else None,
+                page_start=int(page_start) if page_start is not None else None,
+                page_end=int(page_end) if page_end is not None else None,
+                total_pages=int(total_pages) if total_pages is not None else None,
             )
             sources.append(citation.to_dict())
 
-        return consolidate_sources_for_display(sources)
+        sources.sort(key=lambda item: int(item.get("citation_index") or 999))
+        return sources
 
     def _parse_tool_message(self, msg: ToolMessage) -> Dict[str, Any]:
         name = msg.name or "unknown"

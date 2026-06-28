@@ -78,6 +78,23 @@ def render_sidebar() -> None:
                 st.rerun()
 
         st.divider()
+        st.markdown("### Sample corpus")
+        st.caption("Bundled demo docs in `sample_data/` — no upload needed.")
+
+        if st.button("Index sample corpus", use_container_width=True):
+            with st.spinner("Indexing sample corpus…"):
+                summary = st.session_state.chat_api.index_sample_corpus()
+            if summary.indexed_chunks:
+                st.success(
+                    f"Indexed {summary.indexed_chunks} chunks from "
+                    f"{summary.indexed_files} file(s)."
+                )
+            elif summary.skipped_files:
+                st.info("Sample corpus already indexed (unchanged files skipped).")
+            else:
+                st.warning("No sample files were indexed.")
+
+        st.divider()
         st.markdown("### Knowledge Base")
         st.caption(f"Namespace: `{NAMESPACE}`")
 

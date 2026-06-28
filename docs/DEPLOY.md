@@ -67,6 +67,60 @@ Get a key at [Google AI Studio](https://aistudio.google.com/apikey). This uses t
 
 Deploy with main file: `app/main.py`
 
+### Pre-load the sample corpus (recommended)
+
+Visitors should be able to ask questions immediately without uploading files.
+
+**Option A — auto-index on startup (easiest):** add to Streamlit secrets:
+
+```toml
+AUTO_INDEX_SAMPLE_CORPUS = true
+```
+
+The app indexes `sample_data/` once when the knowledge base is empty.
+
+**Option B — index before deploy:** run locally against the same Pinecone indexes:
+
+```bash
+python scripts/index_sample_corpus.py
+```
+
+**Option C — in-app:** click **Index sample corpus** in the sidebar after the app loads.
+
+### Deploy steps
+
+1. Push this repo to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**
+3. Repository: `noumanaziz7241/rag_streamlit` (or your fork)
+4. Branch: `main`
+5. Main file path: `app/main.py`
+6. **Advanced settings → Secrets** — paste TOML from `.streamlit/secrets.toml.example` with real keys
+7. Deploy, then add your URL to the README **Live demo** section
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=noumanaziz7241/rag_streamlit&branch=main&mainPath=app/main.py)
+
+After deploy, smoke-test with:
+
+- *"What tech stack does Memory Agent Chat use?"*
+- *"How does MMR retrieval work?"*
+
+---
+
+## Sample corpus
+
+Bundled demo files live in `sample_data/`:
+
+| File | Topic |
+|------|--------|
+| `memory_agent_overview.md` | Architecture and tech stack |
+| `rag_pipeline_guide.md` | Ingestion and MMR retrieval |
+| `agent_tools_reference.md` | Agent tools |
+| `demo_faq.md` | Demo and deploy FAQ |
+
+Index via sidebar, CLI (`scripts/index_sample_corpus.py`), or `AUTO_INDEX_SAMPLE_CORPUS=true`.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for system diagrams.
+
 ### Vertex AI: service account (only if key creation is allowed)
 
 Skip this section if GCP shows: *"Organization Policy that blocks service account key creation"*.
@@ -166,6 +220,7 @@ To re-enable later:
 | `GEMINI_CHAT_MODEL` | No | Default: `gemini-2.5-flash` |
 | `DEEPSEEK_API_KEY` | No | Disabled by default |
 | `CHAT_DB_PATH` | No | SQLite path (default: `./chat_memory.db`) |
+| `AUTO_INDEX_SAMPLE_CORPUS` | No | Index `sample_data/` on startup when KB is empty |
 
 ---
 

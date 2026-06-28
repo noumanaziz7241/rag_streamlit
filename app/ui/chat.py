@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import streamlit as st
 
 from app.ui.message_render import render_citations, render_tool_transparency
+from memory_agent.utils.errors import format_chat_error
 from memory_agent.utils.message_content import extract_text_content
 from memory_agent.utils.sources import consolidate_sources_for_display
 
@@ -118,7 +119,7 @@ def _stream_assistant_response(prompt: str) -> None:
         elif event_type == "error":
             status_placeholder.empty()
             tools_placeholder.empty()
-            st.error(f"Error: {event.get('error', 'Unknown error')}")
+            st.error(format_chat_error(event.get("error", "Unknown error")))
             return
 
         elif event_type == "done":
@@ -141,6 +142,22 @@ def _stream_assistant_response(prompt: str) -> None:
     st.session_state.history_session_id = st.session_state.active_session_id
 
 
+def _render_empty_state() -> None:
+    """Guide new users when the chat has no messages yet."""
+    st.info(
+        "Get started: click **Index sample corpus** in the sidebar, then try a question below."
+    )
+    st.markdown("**Try asking:**")
+    prompts = [
+        "What tech stack does Memory Agent Chat use?",
+        "How does MMR retrieval work in this project?",
+        "What tools does the agent have for memory and retrieval?",
+        "Remember that I'm demoing this for a portfolio review.",
+    ]
+    for prompt in prompts:
+        st.markdown(f"- *{prompt}*")
+
+
 def render_chat() -> None:
     """Render the main chat area and handle user input."""
     active_session = st.session_state.chat_api.sessions.get_session(
@@ -155,6 +172,9 @@ def render_chat() -> None:
 
     for message in st.session_state.messages:
         _render_message(message)
+
+    if not st.session_state.messages:
+        _render_empty_state()
 
     if prompt := st.chat_input("Type your message here..."):
         with st.chat_message("user"):
