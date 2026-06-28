@@ -44,3 +44,5 @@ meili_data_v1.12/
 *.swo
 .DS_Store
 Thumbs.db
+*.json
+docs/
