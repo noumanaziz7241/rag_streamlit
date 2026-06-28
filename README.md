@@ -11,6 +11,11 @@
 A Streamlit chat application powered by LangGraph that combines conversational memory, domain knowledge retrieval (RAG), and persistent multi-session chat history. The agent remembers user-specific facts, retrieves chunked domain documents with MMR search, and keeps each conversation in its own checkpointed thread.
 
 [![CI](https://github.com/noumanaziz7241/rag_streamlit/actions/workflows/ci.yml/badge.svg)](https://github.com/noumanaziz7241/rag_streamlit/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
+[![LangGraph](https://img.shields.io/badge/LangGraph-agent-orange)](https://github.com/langchain-ai/langgraph)
+[![Pinecone](https://img.shields.io/badge/Pinecone-vector%20DB-000000)](https://www.pinecone.io)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=noumanaziz7241/rag_streamlit&branch=main&mainPath=app/main.py)
 
 ## Features
 
@@ -62,21 +67,23 @@ rag_streamlit/
 ├── assets/
 │   └── demo.gif                  # README demo animation
 ├── docs/
+│   ├── ARCHITECTURE.md           # Mermaid diagrams + module map
 │   ├── DEPLOY.md                 # Docker + Streamlit Cloud deployment
-│   └── PORTFOLIO_ROADMAP.md       # Portfolio improvement guide
+│   └── PORTFOLIO_ROADMAP.md      # Portfolio improvement guide
 ├── evals/
 │   ├── corpus/                   # Fixed eval corpus
 │   ├── golden_qa.json            # Golden Q&A set
 │   ├── metrics.py                # recall@k + faithfulness metrics
 │   └── run_eval.py               # Evaluation runner
-├── sample_data/                  # Demo files for live showcase
+├── sample_data/                  # Demo corpus (4 bundled markdown files)
+├── scripts/
+│   ├── index_sample_corpus.py    # CLI: index sample_data/ into Pinecone
+│   └── generate_demo_gif.py      # Regenerate demo GIF
 ├── tests/                        # Pytest suite
 ├── .github/workflows/ci.yml      # GitHub Actions CI
 ├── Dockerfile
 ├── docker-compose.yml
 ├── deploy.sh                     # One-command Docker deploy
-├── scripts/
-│   └── generate_demo_gif.py      # Regenerate demo GIF
 ├── streamlit_chat.py             # Backward-compatible entry point
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -86,25 +93,32 @@ rag_streamlit/
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    UI["Streamlit UI"] --> API["ChatAPI"]
+    API --> Agent["MemoryAgent\nLangGraph"]
+    Agent --> Recall["load_recalls"]
+    Agent --> LLM["Gemini agent"]
+    Agent --> Tools["tools"]
+    Tools --> Mem["Pinecone memory"]
+    Tools --> RAG["retrieve_domain"]
+    RAG --> MMR["MMR + gemini-embedding-2"]
+    MMR --> Domain["Pinecone domain"]
+    RAG --> Flash["Gemini Flash enrichment"]
+    Agent --> SQLite["SQLite checkpoints"]
 ```
-Streamlit UI (app/)
-        │
-        ▼
-   ChatAPI (memory_agent/api.py)
-        │
-        ├── SessionStore ──► SQLite session metadata
-        └── MemoryAgent ──► LangGraph checkpointed threads
-                │
-                ├── load_recalls ──► recall_memory (Pinecone memory)
-                ├── agent ──► Gemini + full thread history
-                └── tools ──► save_memory | recall_memory | retrieve_domain
-                                      │
-                                      ▼
-                            rag/pipeline + domain_index (multimodal MMR)
-                                      │
-                                      ▼
-              gemini-embedding-2 + Gemini Flash + Pinecone
-```
+
+Full diagrams (sequence flow, module map, tech decisions): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+
+## Tech decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **LangGraph** | Checkpointed multi-session threads, explicit tool routing, stream modes |
+| **MMR retrieval** | Diverse chunks vs redundant top-k (`lambda_mult=0.65`) |
+| **Gemini Embedding 2** | One embedding space for text, PDF, image, audio, and video |
+| **Two Pinecone indexes** | Separate domain knowledge and session-scoped memory filters |
+| **`memory_agent/` vs `app/`** | Core logic stays deployable without Streamlit (future FastAPI) |
 
 ## Tech Stack
 
@@ -217,20 +231,46 @@ List existing indexes: `python scripts/create_pinecone_indexes.py --list`
 ## Quick start (one command)
 
 ```bash
-cp .env.example .env   # add API keys
+cp .env.example .env   # add API keys (GEMINI_API_KEY + Pinecone)
 chmod +x deploy.sh
 ./deploy.sh
 ```
 
-Opens at [http://localhost:8501](http://localhost:8501). See [docs/DEPLOY.md](docs/DEPLOY.md) for Streamlit Cloud and manual setup.
+Opens at [http://localhost:8501](http://localhost:8501). Docker enables `AUTO_INDEX_SAMPLE_CORPUS` so the bundled demo docs index on first run.
+
+See [docs/DEPLOY.md](docs/DEPLOY.md) for Streamlit Cloud and manual setup.
+
+## Sample corpus
+
+Four markdown files in `sample_data/` ship with the repo for instant demos:
+
+| File | Topic |
+|------|--------|
+| `memory_agent_overview.md` | Architecture and tech stack |
+| `rag_pipeline_guide.md` | Ingestion, MMR, tuning |
+| `agent_tools_reference.md` | Memory and retrieval tools |
+| `demo_faq.md` | Demo and deploy FAQ |
+
+**Load the corpus:**
+
+- **Sidebar** → **Index sample corpus**
+- **CLI:** `python scripts/index_sample_corpus.py`
+- **Docker / Cloud:** `AUTO_INDEX_SAMPLE_CORPUS=true` (default in `.env.example` and docker-compose)
 
 ## Live demo
 
-Deploy to [Streamlit Community Cloud](https://share.streamlit.io) with main file `app/main.py` and secrets from `.streamlit/secrets.toml.example`. Add your live URL here after deploying:
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=noumanaziz7241/rag_streamlit&branch=main&mainPath=app/main.py)
 
-```
-https://YOUR-APP-NAME.streamlit.app
-```
+**Deploy your public demo:**
+
+1. Fork or use this repo on GitHub
+2. [Streamlit Community Cloud](https://share.streamlit.io) → **New app** → main file `app/main.py`
+3. Add secrets from [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) (include `AUTO_INDEX_SAMPLE_CORPUS = true`)
+4. Replace the URL below with your deployed app:
+
+**Live app:** `https://YOUR-APP-NAME.streamlit.app` *(add after deploy)*
+
+Smoke-test prompts: *"What tech stack does Memory Agent Chat use?"* · *"How does MMR retrieval work?"*
 
 ## Running the App (development)
 
@@ -275,17 +315,17 @@ Upload any supported file in the sidebar and click **Index documents**. When you
 
 ### Demo flow
 
-1. Upload a PDF or text file in the sidebar and click **Index documents**
-2. Ask a question about the uploaded content
+1. Click **Index sample corpus** in the sidebar (or use auto-index on Docker/Cloud)
+2. Ask: *"What tech stack does Memory Agent Chat use?"*
 3. Watch the response **stream** in real time
 4. Expand **Agent tools** to see `retrieve_domain` (and memory tools when used)
-5. Expand **Sources** to inspect filenames, chunk indexes, and previews
+5. Expand **References** — inline `[1]`, `[2]` should match the numbered list
 
 Example prompts:
 
-- *"Summarize the main points from the uploaded document."*
+- *"How does MMR retrieval work in this project?"*
+- *"What tools does the agent have for memory and retrieval?"*
 - *"Remember that my favorite programming language is Python."* → then *"What do you remember about me?"*
-- *"What does the image in my knowledge base show?"* (after uploading an image)
 
 ### Memory
 

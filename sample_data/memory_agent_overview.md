@@ -23,7 +23,7 @@ Memory Agent Chat is a multimodal RAG application built with LangGraph, Streamli
 | Component | Technology |
 |-----------|------------|
 | UI | Streamlit |
-| Agent | LangGraph + DeepSeek |
+| Agent | LangGraph + Gemini 2.5 Flash |
 | Embeddings | Gemini Embedding 2 |
 | Multimodal | Gemini Flash |
 | Vector DB | Pinecone |

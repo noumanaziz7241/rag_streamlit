@@ -194,14 +194,15 @@ class DomainVectorIndex:
         documents: List[Document] = []
         blocks: List[str] = []
 
-        for item in selected:
+        for citation_index, item in enumerate(selected, start=1):
             metadata = dict(item["metadata"])
             metadata["relevance_score"] = item["score"]
+            metadata["citation_index"] = citation_index
             content = self.multimodal_client.enrich_metadata(metadata)
             source = metadata.get("source", "unknown")
             modality = metadata.get("modality", "text")
             blocks.append(
-                f"Source: {source}\n"
+                f"[{citation_index}] Source: {source}\n"
                 f"Modality: {modality}\n"
                 f"Chunk: {metadata.get('chunk_index', 'n/a')}\n"
                 f"Content: {content}"

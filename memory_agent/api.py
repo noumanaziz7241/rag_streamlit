@@ -62,6 +62,17 @@ class ChatAPI:
     def delete_document(self, doc_id: str) -> bool:
         return self.agent.delete_document(doc_id)
 
+    def index_sample_corpus(self):
+        """Index bundled sample_data/ files into the knowledge base."""
+        from memory_agent.demo.corpus import index_sample_corpus
+
+        return index_sample_corpus(self)
+
+    def sample_corpus_is_indexed(self) -> bool:
+        from memory_agent.demo.corpus import sample_corpus_is_indexed
+
+        return sample_corpus_is_indexed(self)
+
     def _touch_session_after_chat(
         self,
         message: str,

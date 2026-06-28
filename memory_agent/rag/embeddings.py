@@ -12,6 +12,7 @@ from memory_agent.config import (
     GEMINI_EMBEDDING_MODEL,
 )
 from memory_agent.google.genai_client import get_genai_client
+from memory_agent.google.retry import call_with_retry
 
 
 class GeminiEmbeddingClient:
@@ -23,16 +24,19 @@ class GeminiEmbeddingClient:
         self.output_dimensionality = EMBEDDING_DIMENSION
 
     def _embed_parts(self, parts: List[types.Part]) -> List[float]:
-        result = self.client.models.embed_content(
-            model=self.model,
-            contents=parts,
-            config=types.EmbedContentConfig(
-                output_dimensionality=self.output_dimensionality,
-            ),
-        )
-        if not result.embeddings:
-            raise ValueError("Gemini embedding API returned no vectors.")
-        return list(result.embeddings[0].values)
+        def _call() -> List[float]:
+            result = self.client.models.embed_content(
+                model=self.model,
+                contents=parts,
+                config=types.EmbedContentConfig(
+                    output_dimensionality=self.output_dimensionality,
+                ),
+            )
+            if not result.embeddings:
+                raise ValueError("Gemini embedding API returned no vectors.")
+            return list(result.embeddings[0].values)
+
+        return call_with_retry(_call)
 
     def embed_document_text(self, text: str, title: str) -> List[float]:
         formatted = f"title: {title} | text: {text}"

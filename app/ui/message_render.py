@@ -7,7 +7,10 @@ from typing import Any, Dict, List
 
 import streamlit as st
 
-from memory_agent.utils.sources import consolidate_sources_for_display, display_filename
+from memory_agent.utils.sources import (
+    consolidate_sources_for_display,
+    format_source_label,
+)
 
 TOOL_ICONS = {
     "save_memory": "💾",
@@ -38,19 +41,17 @@ def render_citations(sources: List[Dict[str, Any]]) -> None:
     doc_count = len({item.get("source", "") for item in display_sources})
 
     with st.expander(f"References ({doc_count})", expanded=False):
-        for index, source in enumerate(display_sources, start=1):
-            filename = display_filename(source.get("source", "unknown"))
+        for fallback_index, source in enumerate(display_sources, start=1):
+            ref_num = source.get("citation_index") or fallback_index
+            label = format_source_label(source)
             modality = source.get("modality", "text")
             preview = source.get("preview", "")
 
-            st.markdown(f"**{index}. {filename}**")
-            meta_bits = [modality]
-            if source.get("chunk_index") is not None:
-                meta_bits.append(f"section {int(source['chunk_index']) + 1}")
-            st.caption(" · ".join(meta_bits))
+            st.markdown(f"**[{ref_num}] {label}**")
+            st.caption(modality)
             if preview:
                 st.markdown(f"> {preview}")
 
             storage_path = source.get("storage_path")
             if modality == "image" and storage_path and Path(storage_path).exists():
-                st.image(storage_path, caption=filename, width=320)
+                st.image(storage_path, caption=label, width=320)

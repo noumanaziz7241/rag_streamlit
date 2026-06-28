@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 SOURCE_PREVIEW_MAX = 140
-MAX_DISPLAY_DOCUMENTS = 4
-MAX_CHUNKS_PER_DOCUMENT = 1
+MAX_DISPLAY_DOCUMENTS = 6
+MAX_CHUNKS_PER_DOCUMENT = 2
 
 _TRAILING_LIST_ARTIFACT = re.compile(r"\s*['\"]?\]\s*$")
 _INLINE_SOURCES_BLOCK = re.compile(
@@ -62,26 +62,38 @@ def build_source_preview(metadata: dict[str, Any], page_content: str = "") -> st
     return "Referenced section"
 
 
+def format_source_label(source: dict[str, Any]) -> str:
+    """Human label for a citation, e.g. ``report.pdf (pages 1–6)``."""
+    filename = display_filename(str(source.get("source", "unknown")))
+    modality = str(source.get("modality", "text"))
+
+    if modality == "pdf":
+        page_start = source.get("page_start")
+        page_end = source.get("page_end")
+        if page_start and page_end:
+            return f"{filename} (pages {page_start}–{page_end})"
+
+    chunk_index = source.get("chunk_index")
+    if chunk_index is not None:
+        return f"{filename} (section {int(chunk_index) + 1})"
+
+    return filename
+
+
 def consolidate_sources_for_display(
     sources: list[dict[str, Any]],
     *,
     max_documents: int = MAX_DISPLAY_DOCUMENTS,
     max_chunks_per_document: int = MAX_CHUNKS_PER_DOCUMENT,
 ) -> list[dict[str, Any]]:
-    """Keep the strongest, diverse citations — one entry per document by default."""
+    """Trim citations for the UI while preserving retrieval order and ``citation_index``."""
     if not sources:
         return []
-
-    ranked = sorted(
-        sources,
-        key=lambda item: float(item.get("relevance_score", 0.0)),
-        reverse=True,
-    )
 
     consolidated: list[dict[str, Any]] = []
     per_document: dict[str, int] = {}
 
-    for source in ranked:
+    for source in sources:
         doc_key = str(source.get("source", "unknown"))
         count = per_document.get(doc_key, 0)
         if count >= max_chunks_per_document:
